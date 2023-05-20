@@ -50,6 +50,41 @@ void quadTree_TYP::delete_tree()
 }
 
 // =======================================================================================
+vector<quadNode_TYP *> quadTree_TYP::get_leaf_nodes()
+{
+  vector<quadNode_TYP *> leafs;
+  root->get_leaf_nodes(&leafs);
+  return leafs;
+}
+
+// =======================================================================================
+void quadNode_TYP::get_leaf_nodes(vector<quadNode_TYP *> * leafs)
+{
+  for (int nn = 0; nn < 4; nn++)
+  {
+    if (this->subnode[nn] != NULL)
+      this->subnode[nn]->get_leaf_nodes(leafs);
+  }
+
+  // Determine of node is a leaf;
+  bool is_leaf = true;
+  for(int nn = 0; nn < 4; nn++)
+  {
+    is_leaf = this->subnode[nn] == NULL && is_leaf;
+  }
+
+  // If leaf node, accumulate p_count:
+  if (is_leaf == true)
+  {
+    leafs->push_back(this);
+  }
+  else
+  {
+   // Do nothing
+  }
+}
+
+// =======================================================================================
 void quadNode_TYP::delete_nodes()
 {
   for (int nn = 0; nn < 4; nn++)
@@ -130,7 +165,7 @@ void quadNode_TYP::populate_node()
       cout << subnode[ni]->ip.size() << endl;
 
       // Populate current subnode if it contains enough particles:
-      if (subnode_ip[ni].size() > quadTree_params->min_count)
+      if (subnode_ip[ni].size() > quadTree_params->min_count || this->depth < 4)
       {
         subnode[ni]->populate_node();
       }

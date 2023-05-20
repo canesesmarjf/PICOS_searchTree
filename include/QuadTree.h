@@ -45,6 +45,7 @@ public:
   int count_leaf_points(int k);
   void get_all_leafs(vector<quadNode_TYP *> *);
   void get_subnode_bounds(int node_index, arma::vec * min_l, arma::vec * max_l);
+  void get_leaf_nodes(vector<quadNode_TYP *> * leafs);
 
 private:
   // Variables:
@@ -84,6 +85,7 @@ public:
   void populate_tree();
   void clear_tree();
   void delete_tree();
+  vector<quadNode_TYP *> get_leaf_nodes();
 
 private:
   // Variables:

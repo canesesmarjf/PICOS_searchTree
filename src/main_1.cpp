@@ -30,7 +30,6 @@ int main()
     fs::create_directory(file_root);
   }
 
-
   // STEP 1:
   // =====================================================================================
   // Load input data:
@@ -108,6 +107,7 @@ int main()
 
   // Save leaf_x p_count profile:
   // -------------------------------------------------------------------------------------
+  xq.save(file_root + "x_q" + ".csv", arma::csv_ascii);
   p_count.save(file_root + "leaf_x_p_count" + ".csv", arma::csv_ascii);
 
   // STEP 2:
@@ -173,7 +173,7 @@ int main()
     if (delta_p_count > 0)
     {
       // Extract all leaf nodes:
-      quadTree[xx].root->get_all_leafs(&leaf_v[xx]);
+      leaf_v[xx] = quadTree[xx].get_leaf_nodes();
 
       // Diagnostics:
       {
@@ -193,6 +193,34 @@ int main()
       leaf_v[xx] = {NULL};
     }
   }
+
+  // Save data to postprocess tree:
+  for (int xx = 0; xx < leaf_x.size() ; xx++)
+  {
+    if (leaf_v[xx][0] != NULL)
+    {
+      // Create variables to contain data:
+      ivec particle_count(leaf_v[xx].size());
+      mat node_center(leaf_v[xx].size(),2);
+      mat node_dim(leaf_v[xx].size(),2);
+
+      for (int vv = 0; vv < leaf_v[xx].size(); vv++)
+      {
+        cout << "p_count = " << leaf_v[xx][vv]->p_count << endl;
+        particle_count(vv) = leaf_v[xx][vv]->p_count;
+        node_center(vv,0) = leaf_v[xx][vv]->center(0);
+        node_center(vv,1) = leaf_v[xx][vv]->center(1);
+        node_dim(vv,0) = leaf_v[xx][vv]->max(0) - leaf_v[xx][vv]->min(0);
+        node_dim(vv,1) = leaf_v[xx][vv]->max(1) - leaf_v[xx][vv]->min(1);
+      }
+
+      particle_count.save(file_root + "leaf_v_" + "p_count" + "_xx_" + to_string(xx) + ".csv", arma::csv_ascii);
+      node_center.save(file_root + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv", arma::csv_ascii);
+      node_dim.save(file_root + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv", arma::csv_ascii);
+
+    }
+  }
+
 
   // STEP X:
   // =====================================================================================

@@ -10,6 +10,7 @@
 
 #include "BinaryTree.h"
 #include "QuadTree.h"
+#include "Vranic.h"
 
 using namespace std::chrono;
 using namespace std;
@@ -114,6 +115,7 @@ int main()
   // =====================================================================================
   // Assemble quad-tree for v-space data and produce leaf_v 2D vector
   // =====================================================================================
+
   // In what follows, we are using a quadtree that differs somewhat from the binary tree used for the x data. The two main differences are the following:
   // - In binary tree, the root node is encapsulated inside a binaryTree_TYP object; while, for the quadtree, the root node is an object of its own
   // - In binary tree, each particle present in x_p is inserted into the tree until it reaches is associted leaf and then it moves to the next particle. In the quadtree, all particles are inserted into the next depth and distributed amongst their respective subnodes. This allows one to track the particle number in each node as be used as stopping metric rather than the depth as in the binary tree for the xdata.
@@ -166,6 +168,8 @@ int main()
 
   // Assembling leaf_v 2D vector:
   // -------------------------------------------------------------------------------------
+  // Constructing leaf_v should not be part of the quadtree class. The reason is that leaf_v is a collection of quadtrees. Such a collection of quadtrees needs to belong to the object which carries out the resampling.
+
   for (int xx = 0; xx < leaf_x.size() ; xx++)
   {
     // Create quadtree[xx] only if leaf_x[xx] is surplus:
@@ -194,6 +198,69 @@ int main()
     }
   }
 
+  // STEP X:
+  // =====================================================================================
+  // Mock up a practice script to apply vranic method and prioritize smaller nodes first:
+  // =====================================================================================
+  // This type of script does NOT belong to either the quadtree NOR the vranic method. This is because this process below relies on a collection of quadtrees. Each of those quadtrees is a collection of nodes in velocity space which become the inputs to the vranic downsampling method:
+
+  vranic_TYP vranic;
+  std::vector<uint> ip_free;
+  int N_min = 10;
+  int N = 0;
+  int M = 6;
+  int particle_surplus = 0;
+  arma::file_type format = arma::csv_ascii;
+  // vector<node_TYP *> leaf_v;
+  vector<int> leaf_v_p_count;
+  // ip_free.clear();
+  int particle_deficit = 0;
+  int exit_flag_v = 0;
+
+  for (int xx = 0; xx < leaf_x.size() ; xx++)
+  {
+    if (leaf_v[xx][0] != NULL)
+    {
+      int Nv = leaf_v[xx].size();
+      vec depth(Nv);
+
+      for(int vv = 0; vv < Nv; vv++)
+      {
+        depth(vv) = leaf_v[xx][vv]->depth;
+      }
+
+      // Create sorted list starting from highest depth to lowest:
+      uvec sorted_index_list = arma::sort_index(depth,"descend");
+
+      // Loop over sorted leaf_v and apply vranic method:
+      for (int vv = 0; vv < sorted_index_list.n_elem; vv++)
+      {
+        // if (exit_flag_v == 1)
+        //   break;
+
+        int tt = sorted_index_list(vv);
+        cout << "density = " << leaf_v[xx][tt]->p_count << endl;
+        cout << "depth = " << leaf_v[xx][tt]->depth << endl;
+        leaf_v[xx][tt]->center.print("center = ");
+
+        // Total number of particles in leaf_z cube:
+        N = leaf_v[xx][tt]->p_count;
+
+      } // sorted index Loop
+
+    } // if not NULL
+  } // xx loop
+
+  // STEP X:
+  // =====================================================================================
+  // Save data from tree to be post-processed in MATLAB:
+  // =====================================================================================
+  // For every leaf_x node, there is a corresponding quadtree in velocity space.
+  // From each of those quadtrees, we have extracted leaf_v which contains a list of all the leaf nodes in velocity space for a given "x" location.
+  // What we are doing in this section is to save the particle count, coordinates and dimensions of the leaf_v nodes on each "x" location,
+  // This data can then be plotted in MATLAB as a group of nested bisected quadrants in velocity space and then we can superimpose the particle data to confirm whether of not the quadtree algorithm is working.
+  // We can visually inspect of the particle count, coordinate and dimensions of the node match the observed number of particles in that region based on the particle data.
+
   // Save data to postprocess tree:
   for (int xx = 0; xx < leaf_x.size() ; xx++)
   {
@@ -204,23 +271,27 @@ int main()
       mat node_center(leaf_v[xx].size(),2);
       mat node_dim(leaf_v[xx].size(),2);
 
+      // Assemble data:
       for (int vv = 0; vv < leaf_v[xx].size(); vv++)
       {
         cout << "p_count = " << leaf_v[xx][vv]->p_count << endl;
-        particle_count(vv) = leaf_v[xx][vv]->p_count;
-        node_center(vv,0) = leaf_v[xx][vv]->center(0);
-        node_center(vv,1) = leaf_v[xx][vv]->center(1);
-        node_dim(vv,0) = leaf_v[xx][vv]->max(0) - leaf_v[xx][vv]->min(0);
-        node_dim(vv,1) = leaf_v[xx][vv]->max(1) - leaf_v[xx][vv]->min(1);
+        particle_count(vv)  = leaf_v[xx][vv]->p_count;
+        node_center.row(vv) = leaf_v[xx][vv]->center.t();
+        node_dim.row(vv)    = leaf_v[xx][vv]->max.t() - leaf_v[xx][vv]->min.t();
       }
 
-      particle_count.save(file_root + "leaf_v_" + "p_count" + "_xx_" + to_string(xx) + ".csv", arma::csv_ascii);
-      node_center.save(file_root + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv", arma::csv_ascii);
-      node_dim.save(file_root + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv", arma::csv_ascii);
+      // Save data:
+      string file_name;
+      file_name = file_root + "leaf_v_" + "p_count" + "_xx_" + to_string(xx) + ".csv";
+      particle_count.save(file_name, arma::csv_ascii);
 
+      file_name = file_root + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
+      node_center.save(file_name, arma::csv_ascii);
+
+      file_name = file_root + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
+      node_dim.save(file_name, arma::csv_ascii);
     }
   }
-
 
   // STEP X:
   // =====================================================================================

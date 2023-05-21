@@ -104,6 +104,10 @@ function h = plotSquare(center, dimensions, particle_count, min_count)
     dx = dimensions(1);
     dy = dimensions(2);
 
+    % Min dim:
+    dx_min = min(dx);
+    dy_min = min(dy);
+
     % Calculate the coordinates of the square's vertices
     verticesX = [x-dx/2, x+dx/2, x+dx/2, x-dx/2, x-dx/2];
     verticesY = [y-dy/2, y-dy/2, y+dy/2, y+dy/2, y-dy/2];

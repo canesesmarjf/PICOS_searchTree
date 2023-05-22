@@ -7,8 +7,8 @@ export PATH=${FORGE_PATH}:$PATH
 
 if [ "$1" = "1" ]; then
   ddt ./bin/main_1.exe
-# elif [ "$1" = "2" ]; then
-#   ddt ./bin/main_2.exe
+elif [ "$1" = "2" ]; then
+  ddt ./bin/main_2.exe
 # elif [ "$1" = "3" ]; then
 #   ddt ./bin/main_3.exe
 # elif [ "$1" = "4" ]; then
@@ -22,6 +22,6 @@ if [ "$1" = "1" ]; then
 # elif [ "$1" = "7" ]; then
 #   ddt ./bin/main_7.exe
 else
-  echo "Invalid argument. Usage: $0 [1]"
+  echo "Invalid argument. Usage: $0 [1|2]"
   exit 1
 fi

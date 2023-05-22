@@ -18,17 +18,28 @@ using namespace arma;
 namespace fs = filesystem;
 
 /* OBJECTIVE:
-We explore how to insert ALL velocity space data one level at a time and stop process via density on velocity space square rather than on level
+We have created this script based on main_1.cpp and modify it to save the data in the directories required for another project directory structure:
 */
 
 int main()
 {
+  // Choose PICOS++ case:
+  // =====================================================================================
+  string picos_case = "PICOS_case_2";
+  string species_index = "2"; // ss
+  string time_index    = "50"; // tt
+  string scenario      = "ss_" + species_index + "_tt_" + time_index;
+
+  // Choose the input data:
+  // =====================================================================================
+  string root_input = "./Step_1_output/";
+
   // Folder where output data is to be stored:
   // =====================================================================================
-  string file_root = "./output_files/main_1/";
-  if (fs::is_directory(file_root) == false)
+  string root_output = "./Step_2_output/" + picos_case + "/" + scenario;
+  if (fs::is_directory(root_output) == false)
   {
-    fs::create_directory(file_root);
+    fs::create_directories(root_output);
   }
 
   // STEP 1:
@@ -44,14 +55,18 @@ int main()
   arma::mat v_p;
   arma::vec a_p;
 
-  x_p.load("input_files/Step_1_x_p.csv",csv_ascii);
-  v_p.load("input_files/Step_1_v_p.csv",csv_ascii);
-  a_p.load("input_files/Step_1_a_p.csv",csv_ascii);
+  string input_file_name_1 = root_input + picos_case + "/" + "x_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+  string input_file_name_2 = root_input + picos_case + "/" + "v_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+  string input_file_name_3 = root_input + picos_case + "/" + "a_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+
+  x_p.load(input_file_name_1,csv_ascii);
+  v_p.load(input_file_name_2,csv_ascii);
+  a_p.load(input_file_name_3,csv_ascii);
 
   // Normalize data:
   // -------------------------------------------------------------------------------------
   double y_norm = max(max(v_p));
-  double x_norm = 1;
+  double x_norm = ceil(max(x_p));
 
   x_p = x_p/x_norm;
   v_p = v_p/y_norm;
@@ -68,7 +83,7 @@ int main()
   tree_params.dimensionality = 1;
   tree_params.min       = {-1};
   tree_params.max       = {+1};
-  tree_params.max_depth = {+5};
+  tree_params.max_depth = {+5+1};
 
   // Create a vector with pointers to the data:
   // -------------------------------------------------------------------------------------
@@ -109,8 +124,8 @@ int main()
 
   // Save leaf_x p_count profile:
   // -------------------------------------------------------------------------------------
-  xq.save(file_root + "x_q" + ".csv", arma::csv_ascii);
-  p_count.save(file_root + "leaf_x_p_count" + ".csv", arma::csv_ascii);
+  xq.save(root_output + "/"  + "x_q" + ".csv", arma::csv_ascii);
+  p_count.save(root_output + "/"  + "leaf_x_p_count" + ".csv", arma::csv_ascii);
 
   // STEP 2:
   // =====================================================================================
@@ -127,7 +142,7 @@ int main()
   quadTree_params.min       = {-1,-1};
   quadTree_params.max       = {+1,+1};
   quadTree_params.max_depth = {+6};
-  quadTree_params.min_count = {+36};
+  quadTree_params.min_count = {+6*15};
 
   // Create quadtree vector for every leaf_x dataset:
   // -------------------------------------------------------------------------------------
@@ -204,7 +219,7 @@ int main()
   vranic_TYP vranic;
   std::vector<uint> ip_free;
   int N_min = 9;
-  int N_max = 24;
+  int N_max = 300;
   int N = 0;
   int M = 6;
   int particle_surplus = 0;
@@ -424,9 +439,9 @@ int main()
   v_p*= y_norm;
 
   // Save resampled distribution for post-processing
-  x_p.save(file_root + "x_p_new.csv",csv_ascii);
-  v_p.save(file_root + "v_p_new.csv",csv_ascii);
-  a_p.save(file_root + "a_p_new.csv",csv_ascii);
+  x_p.save(root_output + "/"  + "x_p_new.csv",csv_ascii);
+  v_p.save(root_output + "/"  + "v_p_new.csv",csv_ascii);
+  a_p.save(root_output + "/"  + "a_p_new.csv",csv_ascii);
 
   // STEP X:
   // =====================================================================================
@@ -459,13 +474,13 @@ int main()
 
       // Save data:
       string file_name;
-      file_name = file_root + "leaf_v_" + "p_count" + "_xx_" + to_string(xx) + ".csv";
+      file_name = root_output + "/"  + "leaf_v_" + "p_count" + "_xx_" + to_string(xx) + ".csv";
       particle_count.save(file_name, arma::csv_ascii);
 
-      file_name = file_root + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
+      file_name = root_output + "/"  + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
       node_center.save(file_name, arma::csv_ascii);
 
-      file_name = file_root + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
+      file_name = root_output + "/"  + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
       node_dim.save(file_name, arma::csv_ascii);
     }
   }
@@ -474,19 +489,20 @@ int main()
   // =====================================================================================
   // Test clearing data:
   // =====================================================================================
-  quadTree[9].clear_tree();
+  // int xx = 12;
+  // quadTree[xx].clear_tree();
 
   // STEP X:
   // =====================================================================================
   // Test deleting tree and releasing memory:
   // =====================================================================================
-  quadTree[9].delete_tree();
+  // quadTree[xx].delete_tree();
 
   // Re-analize the modified data:
   // ======================================================================
   // Rescale:
-  // x_p/= x_max;
-  // v_p/= v_max;
+  x_p/= x_norm;
+  v_p/= y_norm;
   tree.clear_all();
   tree.insert_all(x_data);
 
@@ -500,7 +516,7 @@ int main()
    p_count[xx] = leaf_x[xx]->p_count;
   }
 
-  p_count.save(file_root + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
+  p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
 
   return 0;
 }

@@ -13,7 +13,7 @@ ifeq ($(shell uname),Darwin)
 else
     LIBS = -L $(ARMA_LIBS) -larmadillo
 endif
-SRCS = main_1.cpp
+SRCS = main_1.cpp main_2.cpp
 OBJS = $(SRCS:%.cpp=obj/%.o)
 EXES = $(SRCS:%.cpp=bin/%.exe)
 OPT = -g

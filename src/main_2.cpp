@@ -27,7 +27,7 @@ int main()
   // =====================================================================================
   string picos_case = "PICOS_case_2";
   string species_index = "2"; // ss
-  string time_index    = "50"; // tt
+  string time_index    = "12"; // tt
   string scenario      = "ss_" + species_index + "_tt_" + time_index;
 
   // Choose the input data:
@@ -127,7 +127,35 @@ int main()
   xq.save(root_output + "/"  + "x_q" + ".csv", arma::csv_ascii);
   p_count.save(root_output + "/"  + "leaf_x_p_count" + ".csv", arma::csv_ascii);
 
-  // STEP 2:
+  // STEP X:
+  // =====================================================================================
+  // Assess conservation:
+  // =====================================================================================
+
+  arma::vec m_t(Nx);
+  arma::vec p_x(Nx);
+  arma::vec p_r(Nx);
+  arma::vec KE(Nx);
+
+  for (int xx = 0; xx < Nx ; xx++)
+  {
+    uvec ip = conv_to<uvec>::from(leaf_x[xx]->ip);
+    m_t[xx] = sum(a_p.elem(ip));
+    mat v_p_subset = v_p.rows(ip);
+    p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
+    p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
+
+    KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+  }
+
+  cout << "Total KE before resampling = " + to_string(sum(KE)) << endl;
+
+  m_t.save(root_output + "/" + "m_profile" + ".csv",csv_ascii);
+  p_x.save(root_output + "/" + "p_x_profile" + ".csv",csv_ascii);
+  p_r.save(root_output + "/" + "p_r_profile" + ".csv",csv_ascii);
+  KE.save(root_output + "/" + "KE_profile" + ".csv",csv_ascii);
+
+  // STEP 3:
   // =====================================================================================
   // Assemble quad-tree for v-space data and produce leaf_v 2D vector
   // =====================================================================================
@@ -141,8 +169,8 @@ int main()
   quadTree_params_TYP quadTree_params;
   quadTree_params.min       = {-1,-1};
   quadTree_params.max       = {+1,+1};
-  quadTree_params.max_depth = {+6};
-  quadTree_params.min_count = {+6*15};
+  quadTree_params.max_depth = +5;
+  quadTree_params.min_count = 144;
 
   // Create quadtree vector for every leaf_x dataset:
   // -------------------------------------------------------------------------------------
@@ -212,7 +240,7 @@ int main()
 
   // STEP X:
   // =====================================================================================
-  // Mock up a practice script to apply vranic method and prioritize smaller nodes first:
+  // Apply vranic method and prioritize smaller nodes first:
   // =====================================================================================
   // This type of script does NOT belong to either the quadtree NOR the vranic method. This is because this process below relies on a collection of quadtrees. Each of those quadtrees is a collection of nodes in velocity space which become the inputs to the vranic downsampling method:
 
@@ -517,6 +545,28 @@ int main()
   }
 
   p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
+
+  // STEP X:
+  // =====================================================================================
+  // Assess conservation:
+  // =====================================================================================
+  for (int xx = 0; xx < Nx ; xx++)
+  {
+    uvec ip = conv_to<uvec>::from(leaf_x[xx]->ip);
+    m_t[xx] = sum(a_p.elem(ip));
+    mat v_p_subset = v_p.rows(ip);
+    p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
+    p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
+
+    KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+  }
+
+  cout << "Total KE after resampling = " + to_string(sum(KE)) << endl;
+
+  m_t.save(root_output + "/" + "m_new_profile" + ".csv",csv_ascii);
+  p_x.save(root_output + "/" + "p_x_new_profile" + ".csv",csv_ascii);
+  p_r.save(root_output + "/" + "p_r_new_profile" + ".csv",csv_ascii);
+  KE.save(root_output + "/" + "KE_new_profile" + ".csv",csv_ascii);
 
   return 0;
 }

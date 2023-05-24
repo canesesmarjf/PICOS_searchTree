@@ -27,7 +27,7 @@ int main()
   // =====================================================================================
   string picos_case = "PICOS_case_2";
   string species_index = "2"; // ss
-  string time_index    = "12"; // tt
+  string time_index    = "25"; // tt
   string scenario      = "ss_" + species_index + "_tt_" + time_index;
 
   // Choose the input data:
@@ -37,6 +37,11 @@ int main()
   // Folder where output data is to be stored:
   // =====================================================================================
   string root_output = "./Step_2_output/" + picos_case + "/" + scenario;
+  if (fs::is_directory(root_output) == true)
+  {
+    fs::remove_all(root_output);
+  }
+
   if (fs::is_directory(root_output) == false)
   {
     fs::create_directories(root_output);
@@ -66,6 +71,7 @@ int main()
   // Normalize data:
   // -------------------------------------------------------------------------------------
   double y_norm = max(max(v_p));
+  if (species_index == "1"){y_norm = 2e6;}
   double x_norm = ceil(max(x_p));
 
   x_p = x_p/x_norm;
@@ -169,8 +175,17 @@ int main()
   quadTree_params_TYP quadTree_params;
   quadTree_params.min       = {-1,-1};
   quadTree_params.max       = {+1,+1};
-  quadTree_params.max_depth = +5;
-  quadTree_params.min_count = 144;
+  if (species_index == "1")
+  {
+    quadTree_params.max_depth = +5;
+    quadTree_params.min_count = 10*4;
+  }
+  else if (species_index == "2")
+  {
+    quadTree_params.max_depth = +5;
+    // quadTree_params.min_count = 144;
+    quadTree_params.min_count = 12*4;
+  }
 
   // Create quadtree vector for every leaf_x dataset:
   // -------------------------------------------------------------------------------------
@@ -246,7 +261,7 @@ int main()
 
   vranic_TYP vranic;
   std::vector<uint> ip_free;
-  int N_min = 9;
+  int N_min = 7;
   int N_max = 300;
   int N = 0;
   int M = 6;
@@ -271,10 +286,13 @@ int main()
       // Assemble depth vector:
       int Nv = leaf_v[xx].size();
       vec depth(Nv);
+      vec p_count(Nv);
       for(int vv = 0; vv < Nv; vv++){depth(vv) = leaf_v[xx][vv]->depth;}
+      for(int vv = 0; vv < Nv; vv++){p_count(vv) = leaf_v[xx][vv]->p_count;}
 
       // Create sorted list starting from highest depth to lowest:
-      uvec sorted_index_list = arma::sort_index(depth,"descend");
+      // uvec sorted_index_list = arma::sort_index(depth,"descend");
+      uvec sorted_index_list = arma::sort_index(p_count,"descend");
 
       // Loop over sorted leaf_v and apply vranic method:
       for (int vv = 0; vv < sorted_index_list.n_elem; vv++)
@@ -304,9 +322,11 @@ int main()
         // Exit condition:
         if (particle_surplus - (N-M) < 0)
         {
-          // We have observed that this exit condition ensures that elements in x_p and v_p are not left to -1. I am not entirely sure why this happens
-          break;
+          N = particle_surplus + M;
         }
+
+        // Test if current node is suitable for resampling:
+        if (N < N_min){continue;}
 
         // Create objects for down-sampling:
         merge_cell_TYP set_N(N);
@@ -341,7 +361,7 @@ int main()
         vranic.print_stats(&set_M); //(I AM HERE) continue with line 269 from main_7.cpp
 
         // Apply changes to distribution function:
-        for (int ii = 0; ii < ip.n_elem; ii++)
+        for (int ii = 0; ii < N; ii++)
         {
           // Get global index:
           int jj = ip(ii);

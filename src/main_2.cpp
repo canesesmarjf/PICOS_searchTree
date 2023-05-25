@@ -27,7 +27,7 @@ int main()
   // =====================================================================================
   string picos_case = "PICOS_case_2";
   string species_index = "2"; // ss
-  string time_index    = "25"; // tt
+  string time_index    = "50"; // tt
   string scenario      = "ss_" + species_index + "_tt_" + time_index;
 
   // Choose the input data:
@@ -265,10 +265,10 @@ int main()
   int N_max = 300;
   int N = 0;
   int M = 6;
-  int particle_surplus = 0;
+  int particle_surplus;
   arma::file_type format = arma::csv_ascii;
   vector<int> leaf_v_p_count;
-  int particle_deficit = 0;
+  int particle_deficit;
   int exit_flag_v = 0;
 
   // Down-sample deficit nodes:
@@ -410,77 +410,110 @@ int main()
   arma::arma_rng::set_seed_random();
   arma::uvec shuffled_index = arma::shuffle(reg_space);
 
-  for (int xx = 0; xx < Nx ; xx++)
+  // Vector to keep track of particle counts in nodes:
+  ivec node_counts(Nx);
+  for (int xx = 0; xx < Nx; xx++)
+    node_counts(xx) = leaf_x[xx]->p_count;
+
+  // Vector to keep track how many times we need to replicate particles per node:
+  ivec rep_num_vec(Nx);
+  for (int xx = 0; xx < Nx; xx++)
+    rep_num_vec(xx) = ceil((double)mean_p_count/node_counts(xx));
+
+  // Layers:
+  vec layer_fraction = {1/2, 1/4, 1/8, 1/16, 1/16};
+  ivec layer(5);
+  layer(0) = (int)round((double)mean_p_count/2);
+  layer(1) = (int)round((double)mean_p_count/4);
+  layer(2) = (int)round((double)mean_p_count/8);
+  layer(3) = (int)round((double)mean_p_count/16);
+  layer(4) = mean_p_count - sum(layer.subvec(0,layer.n_elem - 2));
+
+  for (int ll = 0; ll < layer.n_elem; ll++)
   {
-    // If ip_free is empty, then stop replication:
-    if (ip_free_flag == 1)
-      break;
-
-    // Shuffled index:
-    int xxs = shuffled_index(xx);
-
-    // Calculate particle deficit
-    particle_deficit = leaf_x[xxs]->p_count - mean_p_count;
-
-    if (particle_deficit < 0)
+    for (int xx = 0; xx < Nx ; xx++)
     {
-      // Number of particles to replicate (original particles in node):
-      int num_0 = leaf_x[xxs]->p_count;
+      // If ip_free is empty, then stop replication:
+      if (ip_free_flag == 1)
+        break;
 
-      // Replication number: represents how many times a particle needs to be replicated
-      int rep_num = ceil(mean_p_count/num_0);
+      // Calculate particle deficit
+      int target_counts = sum(layer.subvec(0,ll));
+      particle_deficit = node_counts(xx) - target_counts;
 
-      // Initialize flag that stops replication:
-      int rep_stop = 0;
-
-      // Loop over replication number (represents the number of replication events)
-      for (int rr = 0; rr < rep_num; rr++)
+      if (particle_deficit < 0)
       {
-        if (rep_stop == 1)
-          break;
+        // Number of particles to replicate (original particles in node):
+        int num_0 = leaf_x[xx]->p_count;
 
-        // Loop over num_0 and replicate each one of them once
-        for (int ii = 0; ii < num_0; ii++)
+        // Replication number: represents how many times a particle needs to be replicated
+        // rep_num - 1 gives you the number of new particles per parent particle
+        // int rep_num = ceil((double)layer(ll)/num_0);
+        int rep_num = rep_num_vec(xx);
+
+        // Loop over all particles in node:
+        for (int ii = num_0 - 1; ii >= 0; ii--)
         {
-          // Copy the data from the particle to replicate:
-          uint jj = leaf_x[xxs]->ip[ii];
+          // Get global index of particle to replicate:
+          uint jj = leaf_x[xx]->ip[ii];
+
+          // Remove index since it has been extracted:
+          leaf_x[xx]->ip.pop_back();
+          leaf_x[xx]->p_count--;
+
+          // Diagnostics:
+          if (leaf_x[xx]->p_count < 0)
+            cout << "error:" << endl;
+
+          // Parent particle attributes:
           double xi = x_p(jj);
           double yi = v_p(jj,0);
           double zi = v_p(jj,1);
           double wi = a_p(jj);
 
-          // Replicate particle using the free memory location produced by the down-sampling:
-          uint jj_free = ip_free.back();
-          ip_free.pop_back();
-          x_p(jj_free)   = xi; // - sign(xi)*0.01;
-          v_p(jj_free,0) = yi;
-          v_p(jj_free,1) = zi;
+          // Calculate number of new daughter particles to create:
+          int num_free_left = ip_free.size();
+          int num_deficit_left = -particle_deficit;
+          int num_requested = rep_num -1;
+          ivec num_vec = {num_requested, num_free_left,num_deficit_left};
+          int num_new = num_vec(num_vec.index_min());
 
-          // Adjust weight to conserve mass:
-          a_p(jj)      = wi/2;
-          a_p(jj_free) = wi/2;
-
-          // Decrement deficit:
-          particle_deficit++;
-          if (particle_deficit >= 0)
+          // Create num_new daughter particles:
+          for (int rr = 0; rr < num_new; rr++)
           {
-            rep_stop = 1;
-            break;
+            uint jj_free = ip_free.back();
+            ip_free.pop_back();
+            x_p(jj_free)   = xi; // - sign(xi)*0.01;
+            v_p(jj_free,0) = yi;
+            v_p(jj_free,1) = zi;
+            a_p(jj_free)   = wi/(num_new + 1);
+
+            // Modify deficit:
+            particle_deficit++;
+            node_counts(xx)++;
           }
+
+          // Adjust weight of parent particle to conserve mass:
+          a_p(jj) = wi/(num_new + 1);
 
           // if size of ip_free vanishes, then stop all replication:
           int num_free = ip_free.size();
           if (num_free == 0)
           {
-            rep_stop = 1;
             ip_free_flag = 1;
             break;
           }
 
-        } // num_0 loop
-      } // rep_num loop
-    } // deficit if
-  } // xx loop
+          // If deficit becomes +ve, then stop:
+          if (particle_deficit >= 0)
+          {
+            break;
+          }
+
+        } // particle Loop
+      } // deficit if
+    } // xx loop
+  } // ll Loop
 
   // Rescale:
   x_p*= x_norm;

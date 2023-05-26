@@ -11,6 +11,7 @@ class quadTree_params_TYP
 public:
   arma::vec min; // Minimum lengths that bound domain covered by tree
   arma::vec max; // Maximum lengths that bound domain covered by tree
+  uint min_depth;
   uint max_depth; // Maximum depth to be reached of min_count is not reached first
   uint min_count; // Minimum number of particles in cell allowed.
 

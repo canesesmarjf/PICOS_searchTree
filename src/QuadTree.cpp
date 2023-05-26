@@ -135,43 +135,71 @@ void quadNode_TYP::populate_node()
   // This can enable us to decide whether or not we would like to proceed with creating new subnodes.
   // In the present case, we are using the depth and the number of particles to decide if we
 
-
   // Organize point data into subnode_ip vectors:
   for (int ii = 0; ii < p_count; ii++)
   {
-    // Determine where the current point belongs to relative to subnodes:
+    // Get global index:
     uint jj = ip[ii];
+
+    // Determine where the current point jj belongs to relative to subnodes:
     organize_points(jj);
   }
 
-  // Clear ip since they are now distributed in vector subnode_ip:
-  // Retain p_count, as this tells you how many particles went through this node
-  ip.clear();
-
-  // Calculate new depth:
-  uint depth = this->depth + 1;
-
-  // Local variables to store bounds of subnodes:
-  vec min_local(2);
-  vec max_local(2);
-
-  for (int ni = 0; ni < 4; ni++)
+  // Assess population of each to-be subnode after a minimum depth:
+  // int node_count =  p_count;
+  std::vector<int> subnode_count(4);
+  int min_count_flag;
+  if (depth >= quadTree_params->min_depth)
   {
-    if (subnode_ip[ni].size() > 0)
+    min_count_flag = 0;
+    for (int n = 0; n < 4; n++)
     {
-      // Bounds of new subnode:
-      get_subnode_bounds(ni,&min_local,&max_local);
+      subnode_count[n] = subnode_ip[n].size();
 
-      // Create subnode:
-      vector<uint> ip = subnode_ip[ni];
-      subnode[ni] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
-
-      // Populate current subnode if it contains enough particles:
-      bool condition_1 = subnode_ip[ni].size() > quadTree_params->min_count;
-      bool condition_2 = depth < quadTree_params->max_depth;
-      if (condition_1 || condition_2)
+      // If at least one subnode has counts > min_count, the proceed with bisection:
+      if (subnode_count[n] > quadTree_params->min_count)
       {
-        subnode[ni]->populate_node();
+        min_count_flag = 1;
+      }
+    }
+  }
+  else
+  {
+    min_count_flag = 1;
+  }
+
+  if (min_count_flag == 1)
+  {
+    // Clear ip since they are now distributed in vector subnode_ip:
+    // Retain p_count, as this tells you how many particles went through this node
+    ip.clear();
+
+    // Calculate new depth:
+    uint depth = this->depth + 1;
+
+    // Local variables to store bounds of subnodes:
+    vec min_local(2);
+    vec max_local(2);
+
+    for (int ni = 0; ni < 4; ni++)
+    {
+      if (subnode_ip[ni].size() > 0)
+      {
+        // Bounds of new subnode:
+        get_subnode_bounds(ni,&min_local,&max_local);
+
+        // Create subnode:
+        vector<uint> ip = subnode_ip[ni];
+        subnode[ni] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
+
+        // Populate current subnode if it contains enough particles:
+        // bool condition_1 = subnode_ip[ni].size() > quadTree_params->min_count;
+        // bool condition_1 = subnode_ip[ni].size() > 50;
+        bool condition_2 = depth < quadTree_params->max_depth;
+        if (condition_2) //|| condition_1)
+        {
+          subnode[ni]->populate_node();
+        }
       }
     }
   }

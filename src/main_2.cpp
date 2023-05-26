@@ -26,7 +26,7 @@ int main()
   // Choose PICOS++ case:
   // =====================================================================================
   string picos_case = "PICOS_case_2";
-  string species_index = "2"; // ss
+  string species_index = "1"; // ss
   string time_index    = "50"; // tt
   string scenario      = "ss_" + species_index + "_tt_" + time_index;
 
@@ -184,14 +184,15 @@ int main()
   quadTree_params.max       = {+1,+1};
   if (species_index == "1")
   {
+    quadTree_params.min_depth = +5;
     quadTree_params.max_depth = +6;
-    quadTree_params.min_count = 12*4;
+    quadTree_params.min_count = 7;
   }
   else if (species_index == "2")
   {
+    quadTree_params.min_depth = +5;
     quadTree_params.max_depth = +6;
-    // quadTree_params.min_count = 144;
-    quadTree_params.min_count = 12*4;
+    quadTree_params.min_count = 7;
   }
 
   // Create quadtree vector for every leaf_x dataset:
@@ -301,8 +302,8 @@ int main()
       for(int vv = 0; vv < Nv; vv++){p_count(vv) = leaf_v[xx][vv]->p_count;}
 
       // Create sorted list starting from highest depth to lowest:
-      // uvec sorted_index_list = arma::sort_index(depth,"descend");
-      uvec sorted_index_list = arma::sort_index(p_count,"descend");
+      uvec sorted_index_list = arma::sort_index(depth,"descend");
+      // uvec sorted_index_list = arma::sort_index(p_count,"descend");
 
       // Loop over sorted leaf_v and apply vranic method:
       for (int vv = 0; vv < sorted_index_list.n_elem; vv++)

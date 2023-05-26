@@ -26,7 +26,7 @@ int main()
   // Choose PICOS++ case:
   // =====================================================================================
   string picos_case = "PICOS_case_2";
-  string species_index = "2"; // ss
+  string species_index = "1"; // ss
   string time_index    = "50"; // tt
   string scenario      = "ss_" + species_index + "_tt_" + time_index;
 
@@ -126,14 +126,21 @@ int main()
    leaf_x[xx] = tree.find(xq(xx));
    p_count[xx] = leaf_x[xx]->p_count;
   }
-  int mean_p_count = mean(p_count);
+
+  // Calculating the mean number of particles per node:
+  // -------------------------------------------------------------------------------------
+  // This operation requires the division between two integers; hence, care needs to be taken since this leads to loss of precision:
+  // To account for this, we need to round up to the nearest LARGEST integer so that we over-estimate total number of particles.
+  // Underestimation leads to not being able to reuse all free memory locations later in the replication process.
+  int p_count_sum = sum(p_count);
+  int mean_p_count = ceil((double)p_count_sum/Nx);
 
   // Save leaf_x p_count profile:
   // -------------------------------------------------------------------------------------
   xq.save(root_output + "/"  + "x_q" + ".csv", arma::csv_ascii);
   p_count.save(root_output + "/"  + "leaf_x_p_count" + ".csv", arma::csv_ascii);
 
-  // STEP X:
+  // STEP 3:
   // =====================================================================================
   // Assess conservation:
   // =====================================================================================
@@ -161,7 +168,7 @@ int main()
   p_r.save(root_output + "/" + "p_r_profile" + ".csv",csv_ascii);
   KE.save(root_output + "/" + "KE_profile" + ".csv",csv_ascii);
 
-  // STEP 3:
+  // STEP 4:
   // =====================================================================================
   // Assemble quad-tree for v-space data and produce leaf_v 2D vector
   // =====================================================================================
@@ -178,7 +185,7 @@ int main()
   if (species_index == "1")
   {
     quadTree_params.max_depth = +5;
-    quadTree_params.min_count = 10*4;
+    quadTree_params.min_count = 12*4;
   }
   else if (species_index == "2")
   {
@@ -253,7 +260,7 @@ int main()
     }
   }
 
-  // STEP X:
+  // STEP 5:
   // =====================================================================================
   // Apply vranic method and prioritize smaller nodes first:
   // =====================================================================================
@@ -340,25 +347,20 @@ int main()
         set_N.zi = v_p_subset.col(1);
         set_N.wi = a_p.elem(ip.head(N));
 
-        // Diagnostics: (proven to be correct)
-        {
-          ip.print("ip = ");
-          set_N.xi.print("xi = ");
-          set_N.yi.print("yi = ");
-          set_N.zi.print("zi = ");
-          set_N.wi.print("wi = ");
-        }
-
         // Calculate set M based on set N:
         vranic.down_sample(&set_N, &set_M);
 
-        // Print statistics:
-        cout << "Set N: " << endl;
-        vranic.print_stats(&set_N);
+        // Diagnostics:
+        if (false)
+        {
+          // Print statistics:
+          cout << "Set N: " << endl;
+          vranic.print_stats(&set_N);
 
-        // Print statistics:
-        cout << "Set M: " << endl;
-        vranic.print_stats(&set_M); //(I AM HERE) continue with line 269 from main_7.cpp
+          // Print statistics:
+          cout << "Set M: " << endl;
+          vranic.print_stats(&set_M);
+        }
 
         // Apply changes to distribution function:
         for (int ii = 0; ii < N; ii++)
@@ -406,9 +408,9 @@ int main()
   int ip_free_flag = 0;
 
   // Loop over leaf_x:
-  arma::uvec reg_space = regspace<uvec>(0,1,Nx-1);
-  arma::arma_rng::set_seed_random();
-  arma::uvec shuffled_index = arma::shuffle(reg_space);
+  // arma::uvec reg_space = regspace<uvec>(0,1,Nx-1);
+  // arma::arma_rng::set_seed_random();
+  // arma::uvec shuffled_index = arma::shuffle(reg_space);
 
   // Vector to keep track of particle counts in nodes:
   ivec node_counts(Nx);
@@ -474,8 +476,8 @@ int main()
           // Calculate number of new daughter particles to create:
           int num_free_left = ip_free.size();
           int num_deficit_left = -particle_deficit;
-          int num_requested = rep_num -1;
-          ivec num_vec = {num_requested, num_free_left,num_deficit_left};
+          int num_requested = rep_num - 1;
+          ivec num_vec = {num_requested, num_free_left, num_deficit_left};
           int num_new = num_vec(num_vec.index_min());
 
           // Create num_new daughter particles:
@@ -509,8 +511,13 @@ int main()
           {
             break;
           }
-
         } // particle Loop
+
+        if (particle_deficit != 0)
+        {
+          //abort();
+        }
+
       } // deficit if
     } // xx loop
   } // ll Loop
@@ -524,7 +531,7 @@ int main()
   v_p.save(root_output + "/"  + "v_p_new.csv",csv_ascii);
   a_p.save(root_output + "/"  + "a_p_new.csv",csv_ascii);
 
-  // STEP X:
+  // STEP 6:
   // =====================================================================================
   // Save data from tree to be post-processed in MATLAB:
   // =====================================================================================
@@ -566,14 +573,14 @@ int main()
     }
   }
 
-  // STEP X:
+  // STEP 7:
   // =====================================================================================
   // Test clearing data:
   // =====================================================================================
   // int xx = 12;
   // quadTree[xx].clear_tree();
 
-  // STEP X:
+  // STEP 8:
   // =====================================================================================
   // Test deleting tree and releasing memory:
   // =====================================================================================
@@ -599,7 +606,7 @@ int main()
 
   p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
 
-  // STEP X:
+  // STEP 9:
   // =====================================================================================
   // Assess conservation:
   // =====================================================================================

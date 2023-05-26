@@ -351,7 +351,8 @@ int main()
         set_N.wi = a_p.elem(ip.head(N));
 
         // Calculate set M based on set N:
-        vranic.down_sample(&set_N, &set_M);
+        // vranic.down_sample_3D(&set_N, &set_M);
+        vranic.down_sample_2D(&set_N, &set_M);
 
         // Diagnostics:
         if (false)
@@ -396,10 +397,10 @@ int main()
             // Use set_M for all other quantities (v and a):
 
             // Set N:
-            //x_p(jj) = set_N.xi(ii);
+            x_p(jj) = set_N.xi(ii);
 
             // Set M:
-            x_p(jj)   = set_M.xi(ii);
+            // x_p(jj)   = set_M.xi(ii);
             v_p(jj,0) = set_M.yi(ii);
             v_p(jj,1) = set_M.zi(ii);
             a_p(jj)   = set_M.wi(ii);

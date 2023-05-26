@@ -37,7 +37,8 @@ public:
   vranic_TYP(){};
 
   // Methods:
-  void down_sample(merge_cell_TYP * set_M, merge_cell_TYP * set_N);
+  void down_sample_3D(merge_cell_TYP * set_M, merge_cell_TYP * set_N);
+  void down_sample_2D(merge_cell_TYP * set_M, merge_cell_TYP * set_N);
   void print_stats(merge_cell_TYP * set);
   double get_sigma(merge_cell_TYP * set);
 };

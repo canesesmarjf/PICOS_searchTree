@@ -287,7 +287,7 @@ int main()
         }
 
         // Calculate set M based on set N:
-        vranic.down_sample(&set_N, &set_M);
+        vranic.down_sample_3D(&set_N, &set_M);
 
         // Print statistics:
         cout << "Set N: " << endl;

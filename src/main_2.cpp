@@ -184,12 +184,12 @@ int main()
   quadTree_params.max       = {+1,+1};
   if (species_index == "1")
   {
-    quadTree_params.max_depth = +5;
+    quadTree_params.max_depth = +6;
     quadTree_params.min_count = 12*4;
   }
   else if (species_index == "2")
   {
-    quadTree_params.max_depth = +5;
+    quadTree_params.max_depth = +6;
     // quadTree_params.min_count = 144;
     quadTree_params.min_count = 12*4;
   }

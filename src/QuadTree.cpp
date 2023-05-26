@@ -131,12 +131,17 @@ quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_pa
 // =======================================================================================
 void quadNode_TYP::populate_node()
 {
-  // Insert data into subnode_ip vectors:
+  // The main advantage of this method relative to the single point insertion method, is that by pre-organizing all points a single level at a time, we can undertand in advance, how many points are to be moved into which subnodes.
+  // This can enable us to decide whether or not we would like to proceed with creating new subnodes.
+  // In the present case, we are using the depth and the number of particles to decide if we
+
+
+  // Organize point data into subnode_ip vectors:
   for (int ii = 0; ii < p_count; ii++)
   {
-    // Insert the current point a single level down to the correspoding subnode:
+    // Determine where the current point belongs to relative to subnodes:
     uint jj = ip[ii];
-    insert(jj);
+    organize_points(jj);
   }
 
   // Clear ip since they are now distributed in vector subnode_ip:
@@ -161,12 +166,9 @@ void quadNode_TYP::populate_node()
       vector<uint> ip = subnode_ip[ni];
       subnode[ni] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
 
-      // Diagnostic:
-      // cout << subnode[ni]->ip.size() << endl;
-
       // Populate current subnode if it contains enough particles:
       bool condition_1 = subnode_ip[ni].size() > quadTree_params->min_count;
-      bool condition_2 = depth <= quadTree_params->max_depth;
+      bool condition_2 = depth < quadTree_params->max_depth;
       if (condition_1 || condition_2)
       {
         subnode[ni]->populate_node();
@@ -226,7 +228,7 @@ void quadNode_TYP::get_subnode_bounds(int node_index, arma::vec * min_local, arm
 }
 
 // =======================================================================================
-void quadNode_TYP::insert(uint jj)
+void quadNode_TYP::organize_points(uint jj)
 {
   // Objective:
   // insert point jj into a subnode of the current node. Insert a single level only

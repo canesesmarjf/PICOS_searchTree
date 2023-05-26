@@ -39,7 +39,7 @@ public:
 
   // Methods:
   void populate_node();
-  void insert(uint jj);
+  void organize_points(uint jj);
   void clear_node();
   void delete_nodes();
   int count_leaf_points(int k);

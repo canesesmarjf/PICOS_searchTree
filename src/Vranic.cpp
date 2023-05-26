@@ -27,14 +27,14 @@ void vranic_TYP::down_sample(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
   arma::vec dx = xi - E_x;
   arma::vec dy = yi - E_y;
   arma::vec dz = zi - E_z;
-  arma::vec dr = sqrt(pow(dx,2) + pow(dy,2) + pow(dz,2));
+  arma::vec dr = sqrt(pow(dx,2.0) + pow(dy,2.0) + pow(dz,2.0));
 
   // Calculate skewness vector for deltas:
   int n = 2;
   double mu3_dx = dot(ri,dx%pow(dr,n));
   double mu3_dy = dot(ri,dy%pow(dr,n));
   double mu3_dz = dot(ri,dz%pow(dr,n));
-  double mu3_dr = sqrt(pow(mu3_dx,2) + pow(mu3_dy,2) + pow(mu3_dz,2));
+  double mu3_dr = sqrt(pow(mu3_dx,2.0) + pow(mu3_dy,2.0) + pow(mu3_dz,2.0));
 
   // Calculate the merge-cell coordinate system:
   arma::vec x_hat = {1,0,0};
@@ -48,9 +48,6 @@ void vranic_TYP::down_sample(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
   e_prime.col(0) = x_hat_prime;
   e_prime.col(1) = y_hat_prime;
   e_prime.col(2) = z_hat_prime;
-
-  e_prime.print("e_prime = ");
-  cout << "det(e_prime) = " << det(e_prime) << endl;
 
   // Rotation matrix:
   arma::mat R = e_prime.t();
@@ -70,13 +67,13 @@ void vranic_TYP::down_sample(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
   arma::vec dx_prime = xi_prime - E_x_prime;
   arma::vec dy_prime = yi_prime - E_y_prime;
   arma::vec dz_prime = zi_prime - E_z_prime;
-  arma::vec dr_prime = sqrt(pow(dx_prime,2) + pow(dy_prime,2) + pow(dz_prime,2));
+  arma::vec dr_prime = sqrt(pow(dx_prime,2.0) + pow(dy_prime,2.0) + pow(dz_prime,2.0));
 
   // Standard deviation:
-  double sigma_x_prime = sqrt(dot(ri,pow(dx_prime,2)));
-  double sigma_y_prime = sqrt(dot(ri,pow(dy_prime,2)));
-  double sigma_z_prime = sqrt(dot(ri,pow(dz_prime,2)));
-  double sigma_r_prime = sqrt(dot(ri,pow(dr_prime,2)));
+  double sigma_x_prime = sqrt(dot(ri,pow(dx_prime,2.0)));
+  double sigma_y_prime = sqrt(dot(ri,pow(dy_prime,2.0)));
+  double sigma_z_prime = sqrt(dot(ri,pow(dz_prime,2.0)));
+  double sigma_r_prime = sqrt(dot(ri,pow(dr_prime,2.0)));
 
   // Calculate deltas of new set M:
   int M = set_M->n_elem;
@@ -84,8 +81,8 @@ void vranic_TYP::down_sample(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
   arma::vec dy_prime_M(M);
   arma::vec dz_prime_M(M);
 
-  dx_prime_M(0) = + sqrt(M/2)*sigma_x_prime;
-  dx_prime_M(1) = - sqrt(M/2)*sigma_x_prime;
+  dx_prime_M(0) = + sqrt(M/2.0)*sigma_x_prime;
+  dx_prime_M(1) = - sqrt(M/2.0)*sigma_x_prime;
   dx_prime_M(2) = 0;
   dx_prime_M(3) = 0;
   dx_prime_M(4) = 0;
@@ -93,8 +90,8 @@ void vranic_TYP::down_sample(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
 
   dy_prime_M(0) = 0;
   dy_prime_M(1) = 0;
-  dy_prime_M(2) = + sqrt(M/2)*sigma_y_prime;
-  dy_prime_M(3) = - sqrt(M/2)*sigma_y_prime;
+  dy_prime_M(2) = + sqrt(M/2.0)*sigma_y_prime;
+  dy_prime_M(3) = - sqrt(M/2.0)*sigma_y_prime;
   dy_prime_M(4) = 0;
   dy_prime_M(5) = 0;
 
@@ -102,8 +99,8 @@ void vranic_TYP::down_sample(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
   dz_prime_M(1) = 0;
   dz_prime_M(2) = 0;
   dz_prime_M(3) = 0;
-  dz_prime_M(4) = + sqrt(M/2)*sigma_z_prime;
-  dz_prime_M(5) = - sqrt(M/2)*sigma_z_prime;
+  dz_prime_M(4) = + sqrt(M/2.0)*sigma_z_prime;
+  dz_prime_M(5) = - sqrt(M/2.0)*sigma_z_prime;
 
   // Convert deltas of M into standard frame:
   R = e_prime;
@@ -138,8 +135,8 @@ void vranic_TYP::print_stats(merge_cell_TYP * set)
   arma::vec dx = E_x - xi;
   arma::vec dy = E_y - yi;
   arma::vec dz = E_z - zi;
-  arma::vec dr = sqrt(pow(dx,2) + pow(dy,2) + pow(dz,2));
-  double sigma_r = sqrt(dot(ri,pow(dr,2)));
+  arma::vec dr = sqrt(pow(dx,2.0) + pow(dy,2.0) + pow(dz,2.0));
+  double sigma_r = sqrt(dot(ri,pow(dr,2.0)));
 
   cout << "wt = " << wt << endl;
 
@@ -150,4 +147,26 @@ void vranic_TYP::print_stats(merge_cell_TYP * set)
   cout << "E_z   = " << E_z   << endl;
 
   cout << "sigma_r     = " << sigma_r     << endl;
+}
+
+double vranic_TYP::get_sigma(merge_cell_TYP * set)
+{
+  // Create references:
+  arma::vec& wi = set->wi;
+  arma::vec& yi = set->yi;
+  arma::vec& zi = set->zi;
+
+  // Expectation values:
+  double wt = sum(wi);
+  arma::vec ri = wi/wt;
+  double E_y = dot(ri,yi);
+  double E_z = dot(ri,zi);
+
+  // Calculate deltas:
+  arma::vec dy = E_y - yi;
+  arma::vec dz = E_z - zi;
+  arma::vec dr = sqrt(pow(dy,2.0) + pow(dz,2.0));
+  double sigma_r = sqrt(dot(ri,pow(dr,2.0)));
+
+  return sigma_r;
 }

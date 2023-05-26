@@ -162,7 +162,7 @@ void quadNode_TYP::populate_node()
       subnode[ni] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
 
       // Diagnostic:
-      cout << subnode[ni]->ip.size() << endl;
+      // cout << subnode[ni]->ip.size() << endl;
 
       // Populate current subnode if it contains enough particles:
       bool condition_1 = subnode_ip[ni].size() > quadTree_params->min_count;

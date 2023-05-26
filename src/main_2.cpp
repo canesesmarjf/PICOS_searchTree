@@ -26,7 +26,7 @@ int main()
   // Choose PICOS++ case:
   // =====================================================================================
   string picos_case = "PICOS_case_2";
-  string species_index = "1"; // ss
+  string species_index = "2"; // ss
   string time_index    = "50"; // tt
   string scenario      = "ss_" + species_index + "_tt_" + time_index;
 
@@ -248,9 +248,9 @@ int main()
         sum = sum + leaf_v[xx][ll]->p_count;
       int ip_count = quadTree[xx].root->count_leaf_points(0);
 
-      cout << "p_count[xx] = " << p_count[xx] << endl;
-      cout << "ip_count = " << ip_count << endl;
-      cout << "sum = " << sum << endl;
+      // cout << "p_count[xx] = " << p_count[xx] << endl;
+      // cout << "ip_count = " << ip_count << endl;
+      // cout << "sum = " << sum << endl;
       }
 
     }
@@ -266,11 +266,14 @@ int main()
   // =====================================================================================
   // This type of script does NOT belong to either the quadtree NOR the vranic method. This is because this process below relies on a collection of quadtrees. Each of those quadtrees is a collection of nodes in velocity space which become the inputs to the vranic downsampling method:
 
+  // NOTE:
+  // I have observed that the KE is not fully conserved using the vranic method. it is conserved to 1e-4, however, on closer inspection, it seems that I need to make a N to 4 vranic method so that we can exactly conserve KE.
+
   vranic_TYP vranic;
   std::vector<uint> ip_free;
   int N_min = 7;
   int N_max = 300;
-  int N = 0;
+  int N;
   int M = 6;
   int particle_surplus;
   arma::file_type format = arma::csv_ascii;
@@ -278,7 +281,7 @@ int main()
   int particle_deficit;
   int exit_flag_v = 0;
 
-  // Down-sample deficit nodes:
+  // Down-sample surplus nodes:
   // -------------------------------------------------------------------------------------
   for (int xx = 0; xx < leaf_x.size() ; xx++)
   {
@@ -286,7 +289,7 @@ int main()
     exit_flag_v = 0;
 
     // Calculate particle surplus
-    particle_surplus = leaf_x[xx]->p_count - round(mean_p_count);
+    particle_surplus = leaf_x[xx]->p_count - mean_p_count;
 
     if (leaf_v[xx][0] != NULL)
     {
@@ -311,11 +314,11 @@ int main()
         int tt = sorted_index_list(vv);
 
         // Diagnostics:
-        {
-          cout << "density = " << leaf_v[xx][tt]->p_count << endl;
-          cout << "depth = " << leaf_v[xx][tt]->depth << endl;
-          leaf_v[xx][tt]->center.print("center = ");
-        }
+        // {
+        //   cout << "density = " << leaf_v[xx][tt]->p_count << endl;
+        //   cout << "depth = " << leaf_v[xx][tt]->depth << endl;
+        //   leaf_v[xx][tt]->center.print("center = ");
+        // }
 
         // Total number of particles in leaf_v cube:
         N = leaf_v[xx][tt]->p_count;
@@ -362,6 +365,23 @@ int main()
           vranic.print_stats(&set_M);
         }
 
+        // Diagnostics:
+        double ratio;
+        if (true)
+        {
+          // Print statistics:
+          double sigma_N = vranic.get_sigma(&set_N);
+          // cout << "Set N: sigma_r = " << sigma_N << endl;
+
+          // Print statistics:
+          double sigma_M = vranic.get_sigma(&set_M);
+          // cout << "Set M: sigma_r = " << sigma_M << endl;
+
+          ratio = sigma_M/sigma_N;
+          // cout << "sqrt(ratio of M/N) = " << sqrt(ratio) << endl;
+          // cout << " " << endl;
+        }
+
         // Apply changes to distribution function:
         for (int ii = 0; ii < N; ii++)
         {
@@ -376,12 +396,14 @@ int main()
             // Use set_M for all other quantities (v and a):
 
             // Set N:
-            x_p(jj) = set_N.xi(ii);
+            //x_p(jj) = set_N.xi(ii);
 
             // Set M:
+            x_p(jj)   = set_M.xi(ii);
             v_p(jj,0) = set_M.yi(ii);
             v_p(jj,1) = set_M.zi(ii);
             a_p(jj)   = set_M.wi(ii);
+
           }
           else
           {
@@ -433,6 +455,7 @@ int main()
 
   for (int ll = 0; ll < layer.n_elem; ll++)
   {
+    cout << "ll = " << ll << endl;
     for (int xx = 0; xx < Nx ; xx++)
     {
       // If ip_free is empty, then stop replication:
@@ -459,9 +482,12 @@ int main()
           // Get global index of particle to replicate:
           uint jj = leaf_x[xx]->ip[ii];
 
-          // Remove index since it has been extracted:
-          leaf_x[xx]->ip.pop_back();
-          leaf_x[xx]->p_count--;
+          // On the last layer, remove the indexes since they have been fully used:
+          if (ll == layer.n_elem)
+          {
+            leaf_x[xx]->ip.pop_back();
+            leaf_x[xx]->p_count--;
+          }
 
           // Diagnostics:
           if (leaf_x[xx]->p_count < 0)
@@ -488,7 +514,7 @@ int main()
             x_p(jj_free)   = xi; // - sign(xi)*0.01;
             v_p(jj_free,0) = yi;
             v_p(jj_free,1) = zi;
-            a_p(jj_free)   = wi/(num_new + 1);
+            a_p(jj_free)   = wi/((double)num_new + 1.0);
 
             // Modify deficit:
             particle_deficit++;
@@ -496,7 +522,7 @@ int main()
           }
 
           // Adjust weight of parent particle to conserve mass:
-          a_p(jj) = wi/(num_new + 1);
+          a_p(jj) = wi/((double)num_new + 1.0);
 
           // if size of ip_free vanishes, then stop all replication:
           int num_free = ip_free.size();
@@ -554,7 +580,7 @@ int main()
       // Assemble data:
       for (int vv = 0; vv < leaf_v[xx].size(); vv++)
       {
-        cout << "p_count = " << leaf_v[xx][vv]->p_count << endl;
+        // cout << "p_count = " << leaf_v[xx][vv]->p_count << endl;
         particle_count(vv)  = leaf_v[xx][vv]->p_count;
         node_center.row(vv) = leaf_v[xx][vv]->center.t();
         node_dim.row(vv)    = leaf_v[xx][vv]->max.t() - leaf_v[xx][vv]->min.t();

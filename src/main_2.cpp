@@ -19,6 +19,33 @@ namespace fs = filesystem;
 
 /* OBJECTIVE:
 We have created this script based on main_1.cpp and modify it to save the data in the directories required for another project directory structure:
+
+describe procudure tp use thise script and needed directires and worfkflow
+
+*/
+
+/* HOW TO USE THIS SCRIPT:
+This script belongs to the PICOS_searchTree repo.
+In its current use, this script is ran in the folowing directory:
+
+/home/jfcm/Documents/compX/ARPAE/Effort_2_Vranic/Step_3_Vranic_improved_resampling
+
+This script is part of a workflow:
+0 - pwd needs to be the following directory:
+  + /home/jfcm/Documents/compX/ARPAE/Effort_2_Vranic/Step_3_Vranic_improved_resampling
+
+1 - Step_1_PreviewPICOSdata.m: Extracts data from HDF5 files and produces .csv files
+  + There are at least three source of data:
+    > PICOS_case_0
+    > PICOS_case_1
+    > PICOS_case_2
+  + Each case has several time steps (tt) and species (ss) to select From
+
+2 - Step_2 is to run this script and read the .csv files produced by step 1 and carries out the binary and quadtrees and produces a resampled distribution in .csv files and a set of files which describe the indexing performed by the search trees
+
+3 - Step_3_PostProcess_Search_Tree.m, reads the output produced by Step_2 and checks results of tree indexing with actual particle data, it also performs a conservation checks
+
+4 - Step_4_PostProcess_moments.m, calculates particle moments for original and resampled distirbution
 */
 
 int main()
@@ -430,11 +457,6 @@ int main()
   // -------------------------------------------------------------------------------------
   // Initialize replication flag:
   int ip_free_flag = 0;
-
-  // Loop over leaf_x:
-  // arma::uvec reg_space = regspace<uvec>(0,1,Nx-1);
-  // arma::arma_rng::set_seed_random();
-  // arma::uvec shuffled_index = arma::shuffle(reg_space);
 
   // Vector to keep track of particle counts in nodes:
   ivec node_counts(Nx);

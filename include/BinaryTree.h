@@ -93,7 +93,7 @@ class binaryTree_TYP
 {
 public:
   // Constructor:
-  binaryTree_TYP();
+  binaryTree_TYP(){};
   binaryTree_TYP(tree_params_TYP * tree_params);
 
   // Variables:

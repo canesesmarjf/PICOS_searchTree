@@ -80,6 +80,8 @@ public:
   // Variables:
   quadNode_TYP * root; // Root node of tree
   quadTree_params_TYP * quadTree_params;  // Pointer to tree attributes
+
+  // This might need to be removed as it is unused:
   std::vector<quadNode_TYP *> leaf_v; // List of pointers to leaf nodes
 
   // Methods:
@@ -87,6 +89,9 @@ public:
   void clear_tree();
   void delete_tree();
   vector<quadNode_TYP *> get_leaf_nodes();
+
+  // QUESTION:
+  // Everytime we add data to the quadtree, do we need to delete all leaf nodes? This means releasing memory and deleting dangling pointers. We need to consider this carefully as we will be using the quadtrees potetially millions of times.
 
 private:
   // Variables:

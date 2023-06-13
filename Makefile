@@ -13,7 +13,7 @@ ifeq ($(shell uname),Darwin)
 else
     LIBS = -L $(ARMA_LIBS) -larmadillo
 endif
-SRCS = main_1.cpp main_2.cpp
+SRCS = main_2.cpp main_3.cpp
 OBJS = $(SRCS:%.cpp=obj/%.o)
 EXES = $(SRCS:%.cpp=bin/%.exe)
 OPT = -g
@@ -21,7 +21,7 @@ OPT = -g
 # ========================================================================================
 all: $(EXES)
 
-bin/%.exe: obj/%.o obj/BinaryTree.o obj/Vranic.o obj/QuadTree.o
+bin/%.exe: obj/%.o obj/BinaryTree.o obj/Vranic.o obj/QuadTree.o obj/particle_tree.o
 	$(COMPILER) -o $@ $^ $(LIBS)
 
 	if [ $(SYS) = "Darwin" ]; then \
@@ -36,6 +36,9 @@ obj/BinaryTree.o: src/BinaryTree.cpp include/BinaryTree.h
 	$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
 
 obj/QuadTree.o: src/QuadTree.cpp include/QuadTree.h
+		$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
+
+obj/particle_tree.o: src/particle_tree.cpp include/particle_tree.h
 		$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
 
 obj/Vranic.o: src/Vranic.cpp include/Vranic.h

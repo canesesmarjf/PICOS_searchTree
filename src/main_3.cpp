@@ -510,17 +510,36 @@ int main()
 
   // return 0;
 
-
   // STEP 7:
+  // =====================================================================================
+  // Test counting points in quadtree:
+  // =====================================================================================
+  {
+    vec qt_count = zeros<vec>(particle_tree.Nx);
+    vec bt_count = zeros<vec>(particle_tree.Nx);
+    for (int xx = 0; xx < particle_tree.Nx; xx++)
+    {
+      qt_count[xx] = particle_tree.quad_tree[xx].count_leaf_points();
+      if (particle_tree.quad_tree[xx].root != NULL)
+        bt_count[xx] = particle_tree.p_count[xx];
+    }
+
+    cout << "Total number of particles in sim (binary tree) " << sum(bt_count) << endl;
+
+    cout << "Total number of particles in sim (quad tree) " << sum(qt_count) << endl;
+  }
+
+  // STEP 8:
   // =====================================================================================
   // Test clearing data:
   // =====================================================================================
   int xx = 24;
   particle_tree.quad_tree[xx].clear_tree();
+
   // The above effectively only clears the value of p_count. This is becuase everytime we create a new subnode, the values of ip are passed onto the new subnode and ip on the parent node is cleared.
   // It is quite possible that we do not need to use this function. Instead we could just clear p_count at the same time we clear ip upon creating a new subnode.
 
-  // STEP 8:
+  // STEP 9:
   // =====================================================================================
   // Test deleting tree and releasing memory:
   // =====================================================================================
@@ -551,7 +570,7 @@ int main()
   // Save output:
   particle_tree.p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
 
-  // STEP 9:
+  // STEP 10:
   // =====================================================================================
   // Assess conservation:
   // =====================================================================================

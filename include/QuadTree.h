@@ -51,23 +51,25 @@ public:
 private:
   // Variables:
   quadTree_params_TYP * quadTree_params; // Pointer to tree parameters
-
-  // Subnodes within this node:
-  //   +------------------+------------------+
-  //   |  left_node = 1   |  right_node = 0  |
-  //   +------------------+------------------+
-  //   |  left_node = 2   |  right_node = 3  |
-  //   +------------------+------------------+
-
   std::vector<quadNode_TYP *> subnode;
   std::vector<vector<uint>> ip_subnode;
   bool is_leaf;
+
+  // subnodes within this node:
+  //   +------------------+------------------+
+  //   |    subnode[1]    |    subnode[0]    |
+  //   +------------------+------------------+
+  //   |    subnode[2]    |    subnode[3]    |
+  //   +------------------+------------------+
 
   // Methods:
   bool IsPointInsideBoundary(arma::vec r);
   int WhichSubNodeDoesItBelongTo(arma::vec r);
   bool DoesSubNodeExist(int subNode);
   void CreateSubNode(int subNode);
+  bool is_node_leaf(int method);
+  int apply_conditionals_ip_subnode();
+
 };
 
 // =====================================================================================
@@ -90,6 +92,7 @@ public:
   void clear_tree();
   void delete_tree();
   vector<quadNode_TYP *> get_leaf_nodes();
+  int count_leaf_points();
 
   // QUESTION:
   // Everytime we add data to the quadtree, do we need to delete all leaf nodes? This means releasing memory and deleting dangling pointers. We need to consider this carefully as we will be using the quadtrees potetially millions of times.

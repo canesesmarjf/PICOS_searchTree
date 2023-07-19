@@ -50,6 +50,16 @@ void quadTree_TYP::delete_tree()
 }
 
 // =======================================================================================
+int quadTree_TYP::count_leaf_points()
+{
+  int k = 0;
+  if (this->root != NULL)
+    return this->root->count_leaf_points(k);
+  else
+    return k;
+}
+
+// =======================================================================================
 vector<quadNode_TYP *> quadTree_TYP::get_leaf_nodes()
 {
   vector<quadNode_TYP *> leafs;
@@ -125,6 +135,42 @@ quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_pa
   this->p_count = ip.size();
   this->is_leaf = false;
 }
+
+// =======================================================================================
+int quadNode_TYP::apply_conditionals_ip_subnode()
+{
+  // Conditionals:
+  bool condition_1 = depth >= quadTree_params->min_depth;
+  bool condition_2 = depth < quadTree_params->max_depth;
+
+  // Reject new subnodes by default:
+  int accept_new_subnodes = 0;
+
+  if (condition_1 == false) // if depth < min_depth, always accept new subnodes:
+  {
+    accept_new_subnodes = 1;
+  }
+  else if (condition_1 && condition_2) // if depth is between [min_depth, max_depth], accept new subnodes if at least ONE of them has enough particles (> min_count)
+  {
+    // Check if at least one of the new subnodes has counts > min_count:
+    // If so, accept new subnodes
+    for (int n = 0; n < 4; n++)
+    {
+      if (ip_subnode[n].size() > quadTree_params->min_count)
+      {
+        accept_new_subnodes = 1;
+        break;
+      }
+    }
+  }
+  else // if depth > max_depth, always reject subnodes:
+  {
+    accept_new_subnodes = 0;
+  }
+
+  return accept_new_subnodes;
+}
+
 
 // =======================================================================================
 /*
@@ -214,43 +260,17 @@ void quadNode_TYP::populate_node()
 
 void quadNode_TYP::populate_node()
 {
-
   // Organize point data into ip_subnode to determine if new subnodes need to be created:
   // -------------------------------------------------------------------------------------
+  // Propose new subnodes
   this->calculate_ip_subnode();
 
   // Run tests to determine if new subnodes are to be accepted:
   // -------------------------------------------------------------------------------------
-  // Conditionals:
-  bool condition_1 = depth >= quadTree_params->min_depth;
-  bool condition_2 = depth < quadTree_params->max_depth;
+  // Do we accept new proposed subnodes?
+  int accept_new_subnodes = this->apply_conditionals_ip_subnode();
 
-  // Reject new subnodes by default:
-  int accept_new_subnodes = 0;
-
-  if (condition_1 == false) // if depth < min_depth, always accept new subnodes:
-  {
-    accept_new_subnodes = 1;
-  }
-  else if (condition_1 && condition_2) // if min_depth <= depth <= max_depth, check counts
-  {
-    // Check if at least one of the new subnodes has counts > min_count:
-    // If so, accept new subnodes
-    for (int n = 0; n < 4; n++)
-    {
-      if (ip_subnode[n].size() > quadTree_params->min_count)
-      {
-        accept_new_subnodes = 1;
-        break;
-      }
-    }
-  }
-  else // if depth > max_depth, always reject subnodes:
-  {
-    accept_new_subnodes = 0;
-  }
-
-  // If accepted, create new subnodes
+  // If accepted, create populate subnodes or create them if they dont exist
   // If not accepted, declare parent node a leaf node
   // -------------------------------------------------------------------------------------
   if (accept_new_subnodes == 1)
@@ -262,28 +282,33 @@ void quadNode_TYP::populate_node()
     vec min_local(2);
     vec max_local(2);
 
-    for (int ni = 0; ni < 4; ni++)
+    for (int n = 0; n < 4; n++)
     {
-      if (ip_subnode[ni].size() > 0)
+      if (ip_subnode[n].size() > 0)
       {
+        // Need to consider what happens if subnodes already exist.
+        // If so, how do we pass the ip_subnode[n] data?
+
         // Bounds of new subnode:
-        get_subnode_bounds(ni,&min_local,&max_local);
+        get_subnode_bounds(n,&min_local,&max_local);
 
         // Create subnode:
-        vector<uint> ip = ip_subnode[ni];
-        subnode[ni] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
+        vector<uint> ip = ip_subnode[n];
+        subnode[n] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
 
         // Move in deeper:
-        subnode[ni]->populate_node();
+        subnode[n]->populate_node();
       }
     }
 
   // Clear ip since they have now being distributed amongsnt new subnodes:
   this->ip.clear();
   this->p_count = 0;
+
+  // Label node is NOT a leaf node:
   this->is_leaf = false;
 
-  } // if (accept_new_subnodes == 1)
+  }
   else
   {
     // Declare node as leaf node
@@ -410,9 +435,65 @@ void quadNode_TYP::calculate_ip_subnode()
 }
 
 // =======================================================================================
+bool quadNode_TYP::is_node_leaf(int method)
+{
+  // This method determines if current node is a leaf node.
+  // There are at least two ways to identify leaf_nodes.
+  // 1- if ALL subnodes == NULL.
+  // 2- if is_leaf == true where the flag is set during the formation of the quad tree in "populate_node()".
+  // The second method is favoured because the quad tree heap memory infrastructure can be reutilized many times; whereas the NULL method relies on realeasing the quad-tree memory every time it is to be refreshed because the data *v has changed.
+
+  bool leaf_flag = true;
+
+  switch (method)
+  {
+    case 1: // NULL method
+    {
+      // Check all subnodes:
+      // If at LEAST ONE subode exist, current node is NOT a leaf:
+      for (int nn = 0; nn < 4; nn++)
+      {
+        if (this->subnode[nn] != NULL)
+        {
+          leaf_flag = false;
+          break;
+        }
+      }
+      break;
+    }
+    case 2: // Read is_leaf variable
+    {
+      leaf_flag = this->is_leaf;
+      break;
+    }
+    default:
+    {
+      // Error: Invalid method
+      std::cerr << "Invalid method. Choose either method 1 or method 2." << std::endl;
+      break;
+    }
+  }
+
+  return leaf_flag;
+}
+
+// =======================================================================================
 int quadNode_TYP::count_leaf_points(int k)
 {
-  // Recursive loop:
+  // This method counts all the points present in a quad tree
+  // First, it deterines if present node is a leaf.
+  // If so, it accumulates p_count
+  // If not so, it proceeds to traverse tree using recursion
+  // Every time a new node is accessed, leaf status is checked.
+
+  // If current is node is a leaf node, accumulate p_count and return to calling stack:
+  int method = 2;
+  if (is_node_leaf(method) == true)
+  {
+    return k + this->p_count;
+  }
+
+  // Traverse the tree:
   for(int nn = 0; nn < 4; nn++)
   {
     // If subnode[nn] exists, drill into it
@@ -422,22 +503,8 @@ int quadNode_TYP::count_leaf_points(int k)
     }
   }
 
-  // Determine of node is a leaf;
-  bool is_leaf_local = true;
-  for(int nn = 0; nn < 4; nn++)
-  {
-    is_leaf_local = this->subnode[nn] == NULL && is_leaf_local;
-  }
-
-  // If leaf node, accumulate p_count:
-  if (is_leaf_local == true)
-  {
-    return k + this->p_count;
-  }
-  else
-  {
-    return k;
-  }
+  // Return to calling stack:
+  return k;
 }
 
 // =======================================================================================

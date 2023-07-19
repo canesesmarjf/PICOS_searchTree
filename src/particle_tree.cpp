@@ -154,42 +154,6 @@ void particle_tree_TYP::populate_tree()
 
   // Assembling leaf_v 2D vector:
   this->calculate_leaf_v();
-/*
-  // Allocate memory and resize leaf_v:
-  leaf_v.resize(Nx);
-
-  for (int xx = 0; xx < leaf_x.size() ; xx++)
-  {
-    // Create quadtree[xx] only if leaf_x[xx] is surplus:
-    int delta_p_count = p_count[xx] - mean_p_count;
-    if (delta_p_count > 0)
-    {
-      cout << "hello 2" << endl;
-
-      // Extract all leaf nodes:
-      leaf_v[xx] = quad_tree[xx].get_leaf_nodes();
-
-      // Diagnostics:
-      if (false)
-      {
-      int sum = 0;
-      for(int ll = 0; ll < leaf_v[xx].size(); ll++)
-        sum = sum + leaf_v[xx][ll]->p_count;
-      int ip_count = quad_tree[xx].root->count_leaf_points(0);
-
-      cout << "p_count[xx] = " << p_count[xx] << endl;
-      cout << "ip_count = " << ip_count << endl;
-      cout << "sum = " << sum << endl;
-      }
-
-    }
-    else
-    {
-      leaf_v[xx] = {NULL};
-      cout << "hello:" << endl;
-    }
-  }
-*/
 
 }
 
@@ -197,254 +161,277 @@ void particle_tree_TYP::populate_tree()
 void particle_tree_TYP::resample_distribution()
 {
 
+  // Notes:
   // Consider updating leaf_x[xx]->ip and p_count everytime you remove or add elements. this allows to reuse the binary tree data leaf_x for other operations.
+
+  // Consider having the following two methods in this block:
+  // - downsample_process(&ip_free);
+  // - replication_process(&ip_free);
+
 
   // Down-sample surplus nodes:
   // -------------------------------------------------------------------------------------
   std::vector<uint> ip_free;
   // this->down_sample(&ip_free);
-  //
-  //
 
-  vranic_TYP vranic;
-  int N_min = 7;
-  int N_max = 300;
-  int N;
-  int M = 6;
-  int particle_surplus;
-
-  for (int xx = 0; xx < leaf_x.size() ; xx++)
+  // Down sampling process:
   {
-    // Calculate particle surplus
-    particle_surplus = leaf_x[xx]->p_count - mean_p_count;
+    // Create vranic down-sampling object:
+    vranic_TYP vranic;
 
-    // Apply Vranic method if node is NOT NULL:
-    if (leaf_v[xx][0] != NULL)
+    // Set the min and maximum number of computational particles per node:
+    int N_min = 7;
+    int N_max = 300;
+
+    // Set the particle set sizes for the input and output sets:
+    int N; // Input set
+    int M = 6; // Output set
+    int particle_surplus;
+
+    // Down-sample distribution and populate ip_free vector:
+    for (int xx = 0; xx < leaf_x.size() ; xx++)
     {
-      // Assemble depth and p_count vectors:
-      int Nv = leaf_v[xx].size();
-      vec depth(Nv);
-      vec p_count(Nv);
-      for(int vv = 0; vv < Nv; vv++){depth(vv) = leaf_v[xx][vv]->depth;}
-      for(int vv = 0; vv < Nv; vv++){p_count(vv) = leaf_v[xx][vv]->p_count;}
+      // Calculate particle surplus
+      particle_surplus = leaf_x[xx]->p_count - mean_p_count;
 
-      // Create sorted list starting from highest depth to lowest:
-      uvec sorted_index_list = arma::sort_index(depth,"descend");
-      // uvec sorted_index_list = arma::sort_index(p_count,"descend");
-
-      // Loop over sorted leaf_v and apply vranic method:
-      for (int vv = 0; vv < sorted_index_list.n_elem; vv++)
+      // Apply Vranic method if x-node is NOT NULL:
+      if (leaf_v[xx][0] != NULL)
       {
-        // Sorted index:
-        int tt = sorted_index_list(vv);
+        // Total number of v-nodes for this xx position:
+        int Nv = leaf_v[xx].size();
 
-        // Diagnostics:
-        // {
-        //   cout << "density = " << leaf_v[xx][tt]->p_count << endl;
-        //   cout << "depth = " << leaf_v[xx][tt]->depth << endl;
-        //   leaf_v[xx][tt]->center.print("center = ");
-        // }
+        // Assemble depth and p_count vectors:
+        vec depth(Nv);
+        vec p_count(Nv);
+        vec node_metric(Nv);
+        for(int vv = 0; vv < Nv; vv++){depth(vv) = leaf_v[xx][vv]->depth;}
+        for(int vv = 0; vv < Nv; vv++){p_count(vv) = leaf_v[xx][vv]->p_count;}
 
-        // Total number of particles in leaf_v cube:
-        N = leaf_v[xx][tt]->p_count;
+        // Calculate metric for every node based on depth*p_count (elementwise multiplication). The higher the depth AND number of particles, the higher the metric:
+        node_metric = depth%p_count;
 
-        // Test if current node is suitable for resampling:
-        if (N < N_min){continue;}
+        // Create sorted list starting from highest depth to lowest:
+        // By giving priority to nodes with highest metric, we are operating on the regions that minimize the changes to the distribution function since they are more localized in velocity space:
+        uvec sorted_index_list = arma::sort_index(node_metric,"descend");
 
-        // Upper limit to the number of particles to down-sample in present cell:
-        if (N > N_max){N = N_max;}
-
-        // Check that we do not go into deficit:
-        if (particle_surplus - (N-M) < 0){N = particle_surplus + M;}
-
-        // Create objects for down-sampling:
-        merge_cell_TYP set_N(N);
-        merge_cell_TYP set_M(M);
-
-        // Define set N particles:
-        arma::uvec ip = conv_to<uvec>::from(leaf_v[xx][tt]->ip);
-        arma::mat v_p_subset = v_p->rows(ip.head(N));
-        set_N.xi = x_p->elem(ip.head(N));
-        set_N.yi = v_p_subset.col(0);
-        set_N.zi = v_p_subset.col(1);
-        set_N.wi = a_p->elem(ip.head(N));
-
-        // Calculate set M based on set N:
-        vranic.down_sample_2D(&set_N, &set_M);
-
-        // Diagnostics:
-        if (false)
+        // Loop over sorted leaf_v and apply vranic method:
+        for (int vv = 0; vv < sorted_index_list.n_elem; vv++)
         {
-          // Print statistics:
-          cout << "Set N: " << endl;
-          vranic.print_stats(&set_N);
+          // Sorted index:
+          int tt = sorted_index_list(vv);
 
-          // Print statistics:
-          cout << "Set M: " << endl;
-          vranic.print_stats(&set_M);
-        }
+          // Total number of particles in leaf_v cube:
+          N = leaf_v[xx][tt]->p_count;
 
-        // Apply changes to distribution function:
-        for (int ii = 0; ii < N; ii++)
-        {
-          // Get global index:
-          int jj = ip(ii);
+          // Test if current node is suitable for resampling:
+          if (N < N_min){continue;}
 
-          // Apply changes to x_p, v_p, a_p OR create new mem locations:
-          if (ii < set_M.n_elem)
+          // Upper limit to the number of particles to down-sample in present cell:
+          if (N > N_max){N = N_max;}
+
+          // Check that we do not go into deficit:
+          if (particle_surplus - (N-M) < 0){N = particle_surplus + M;}
+
+          // Create objects for down-sampling:
+          merge_cell_TYP set_N(N);
+          merge_cell_TYP set_M(M);
+
+          // Define particle indices for set N:
+          arma::uvec ip = conv_to<uvec>::from(leaf_v[xx][tt]->ip);
+          arma::uvec ip_subset = ip.head(N);
+
+          // Assign particle attributes for set N:
+          arma::mat v_p_subset = v_p->rows(ip_subset);
+          set_N.xi = x_p->elem(ip_subset);
+          set_N.yi = v_p_subset.col(0);
+          set_N.zi = v_p_subset.col(1);
+          set_N.wi = a_p->elem(ip_subset);
+
+          // Calculate set M based on set N:
+          vranic.down_sample_2D(&set_N, &set_M);
+
+          // Diagnostics:
+          if (false)
           {
-            // Down-sample global distribution:
-            // Use set_N for xi in order to remove oscillations in density:
-            // Use set_M for all other quantities (v and a):
+            // Print statistics:
+            cout << "Set N: " << endl;
+            vranic.print_stats(&set_N);
 
-            // Set N:
-            (*x_p)(jj) = set_N.xi(ii);
-
-            // Set M:
-            (*v_p)(jj,0) = set_M.yi(ii);
-            (*v_p)(jj,1) = set_M.zi(ii);
-            (*a_p)(jj)   = set_M.wi(ii);
-
+            // Print statistics:
+            cout << "Set M: " << endl;
+            vranic.print_stats(&set_M);
           }
-          else
+
+          // Apply changes to distribution function:
+          for (int ii = 0; ii < N; ii++)
           {
-            // Record global indices that correspond to memory locations that are to be repurposed:
-            ip_free.push_back(jj);
+            // Get global index:
+            int jj = ip(ii);
 
-            // Set values to -1 to flag them as undefined values memory locations:
-            (*x_p)(jj)   = -1;
-            (*v_p)(jj,0) = -1;
-            (*v_p)(jj,1) = -1;
-            (*a_p)(jj)   = -1;
+            // Apply changes to x_p, v_p, a_p OR create new mem locations:
+            if (ii < set_M.n_elem)
+            {
+              // Down-sample global distribution:
+              // Use set_N for xi in order to remove oscillations in density:
+              // Use set_M for all other quantities (v and a):
 
-            // Decrement particle surplus only after ip_free.push_back operation:
-            particle_surplus--;
-          }
-        } // for ip loop
-      } // sorted index Loop
-    } // if not NULL
-  } // xx loop
+              // Set N:
+              (*x_p)(jj) = set_N.xi(ii);
 
+              // Set M:
+              (*v_p)(jj,0) = set_M.yi(ii);
+              (*v_p)(jj,1) = set_M.zi(ii);
+              (*a_p)(jj)   = set_M.wi(ii);
+
+            }
+            else
+            {
+              // Record global indices that correspond to memory locations that are to be repurposed:
+              ip_free.push_back(jj);
+
+              // Set values to -1 to flag them as undefined values memory locations:
+              (*x_p)(jj)   = -1;
+              (*v_p)(jj,0) = -1;
+              (*v_p)(jj,1) = -1;
+              (*a_p)(jj)   = -1;
+
+              // Decrement particle surplus only after ip_free.push_back operation:
+              particle_surplus--;
+            }
+          } // for ip loop
+        } // sorted index Loop
+      } // if not NULL
+    } // xx loop
+
+  } // Down sampling process
 
   // Populate deficit regions:
   // -------------------------------------------------------------------------------------
   // INPUTS: ip_free;
-  // Initialize replication flag:
-  int ip_free_flag = 0;
-  int particle_deficit;
+  // class members used:
+  // leaf_x
+  // Nx
+  // x_p, v_p, a_p
 
-  // Vector to keep track of particle counts in nodes:
-  ivec node_counts(Nx);
-  for (int xx = 0; xx < Nx; xx++)
-    node_counts(xx) = leaf_x[xx]->p_count;
-
-  // Vector to keep track how many times we need to replicate particles per node:
-  ivec rep_num_vec(Nx);
-  for (int xx = 0; xx < Nx; xx++)
-    rep_num_vec(xx) = ceil((double)mean_p_count/node_counts(xx));
-
-  // Layers:
-  vec layer_fraction = {1/2, 1/4, 1/8, 1/16, 1/16};
-  ivec layer(5);
-  layer(0) = (int)round((double)mean_p_count/2);
-  layer(1) = (int)round((double)mean_p_count/4);
-  layer(2) = (int)round((double)mean_p_count/8);
-  layer(3) = (int)round((double)mean_p_count/16);
-  layer(4) = mean_p_count - sum(layer.subvec(0,layer.n_elem - 2));
-
-  for (int ll = 0; ll < layer.n_elem; ll++)
+  // Replication process:
   {
-    cout << "ll = " << ll << endl;
-    for (int xx = 0; xx < Nx ; xx++)
+    // Initialize replication flag:
+    int ip_free_flag = 0;
+    int particle_deficit;
+
+    // Vector to keep track of particle counts in nodes:
+    ivec node_counts(Nx);
+    for (int xx = 0; xx < Nx; xx++)
+      node_counts(xx) = leaf_x[xx]->p_count;
+
+    // Vector to keep track how many times we need to replicate particles per node:
+    ivec rep_num_vec(Nx);
+    for (int xx = 0; xx < Nx; xx++)
+      rep_num_vec(xx) = ceil((double)mean_p_count/node_counts(xx));
+
+    // Layers:
+    vec layer_fraction = {1/2, 1/4, 1/8, 1/16, 1/16};
+    ivec layer(5);
+    layer(0) = (int)round((double)mean_p_count/2);
+    layer(1) = (int)round((double)mean_p_count/4);
+    layer(2) = (int)round((double)mean_p_count/8);
+    layer(3) = (int)round((double)mean_p_count/16);
+    layer(4) = mean_p_count - sum(layer.subvec(0,layer.n_elem - 2));
+
+    for (int ll = 0; ll < layer.n_elem; ll++)
     {
-      // If ip_free is empty, then stop replication:
-      if (ip_free_flag == 1)
-        break;
-
-      // Calculate particle deficit
-      int target_counts = sum(layer.subvec(0,ll));
-      particle_deficit = node_counts(xx) - target_counts;
-
-      if (particle_deficit < 0)
+      cout << "ll = " << ll << endl;
+      for (int xx = 0; xx < Nx ; xx++)
       {
-        // Number of particles to replicate (original particles in node):
-        int num_0 = leaf_x[xx]->p_count;
+        // If ip_free is empty, then stop replication:
+        if (ip_free_flag == 1)
+          break;
 
-        // Replication number: represents how many times a particle needs to be replicated
-        // rep_num - 1 gives you the number of new particles per parent particle
-        // int rep_num = ceil((double)layer(ll)/num_0);
-        int rep_num = rep_num_vec(xx);
+        // Calculate particle deficit
+        int target_counts = sum(layer.subvec(0,ll));
+        particle_deficit = node_counts(xx) - target_counts;
 
-        // Loop over all particles in node:
-        for (int ii = num_0 - 1; ii >= 0; ii--)
+        if (particle_deficit < 0)
         {
-          // Get global index of particle to replicate:
-          uint jj = leaf_x[xx]->ip[ii];
+          // Number of particles to replicate (original particles in node):
+          int num_0 = leaf_x[xx]->p_count;
 
-          // On the last layer, remove the indexes since they have been fully used:
-          if (ll == layer.n_elem)
+          // Replication number: represents how many times a particle needs to be replicated
+          // rep_num - 1 gives you the number of new particles per parent particle
+          // int rep_num = ceil((double)layer(ll)/num_0);
+          int rep_num = rep_num_vec(xx);
+
+          // Loop over all particles in node:
+          for (int ii = num_0 - 1; ii >= 0; ii--)
           {
-            leaf_x[xx]->ip.pop_back();
-            leaf_x[xx]->p_count--;
+            // Get global index of particle to replicate:
+            uint jj = leaf_x[xx]->ip[ii];
+
+            // On the last layer, remove the indexes since they have been fully used:
+            if (ll == layer.n_elem)
+            {
+              leaf_x[xx]->ip.pop_back();
+              leaf_x[xx]->p_count--;
+            }
+
+            // Diagnostics:
+            if (leaf_x[xx]->p_count < 0)
+              cout << "error:" << endl;
+
+            // Parent particle attributes:
+            double xi = (*x_p)(jj);
+            double yi = (*v_p)(jj,0);
+            double zi = (*v_p)(jj,1);
+            double wi = (*a_p)(jj);
+
+            // Calculate number of new daughter particles to create:
+            int num_free_left = ip_free.size();
+            int num_deficit_left = -particle_deficit;
+            int num_requested = rep_num - 1;
+            ivec num_vec = {num_requested, num_free_left, num_deficit_left};
+            int num_new = num_vec(num_vec.index_min());
+
+            // Create num_new daughter particles:
+            for (int rr = 0; rr < num_new; rr++)
+            {
+              uint jj_free = ip_free.back();
+              ip_free.pop_back();
+              (*x_p)(jj_free)   = xi; // - sign(xi)*0.01;
+              (*v_p)(jj_free,0) = yi;
+              (*v_p)(jj_free,1) = zi;
+              (*a_p)(jj_free)   = wi/((double)num_new + 1.0);
+
+              // Modify deficit:
+              particle_deficit++;
+              node_counts(xx)++;
+            }
+
+            // Adjust weight of parent particle to conserve mass:
+            (*a_p)(jj) = wi/((double)num_new + 1.0);
+
+            // if size of ip_free vanishes, then stop all replication:
+            int num_free = ip_free.size();
+            if (num_free == 0)
+            {
+              ip_free_flag = 1;
+              break;
+            }
+
+            // If deficit becomes +ve, then stop:
+            if (particle_deficit >= 0)
+            {
+              break;
+            }
+          } // particle Loop
+
+          if (particle_deficit != 0)
+          {
+            //abort();
           }
 
-          // Diagnostics:
-          if (leaf_x[xx]->p_count < 0)
-            cout << "error:" << endl;
+        } // deficit if
+      } // xx loop
+    } // ll Loop
 
-          // Parent particle attributes:
-          double xi = (*x_p)(jj);
-          double yi = (*v_p)(jj,0);
-          double zi = (*v_p)(jj,1);
-          double wi = (*a_p)(jj);
-
-          // Calculate number of new daughter particles to create:
-          int num_free_left = ip_free.size();
-          int num_deficit_left = -particle_deficit;
-          int num_requested = rep_num - 1;
-          ivec num_vec = {num_requested, num_free_left, num_deficit_left};
-          int num_new = num_vec(num_vec.index_min());
-
-          // Create num_new daughter particles:
-          for (int rr = 0; rr < num_new; rr++)
-          {
-            uint jj_free = ip_free.back();
-            ip_free.pop_back();
-            (*x_p)(jj_free)   = xi; // - sign(xi)*0.01;
-            (*v_p)(jj_free,0) = yi;
-            (*v_p)(jj_free,1) = zi;
-            (*a_p)(jj_free)   = wi/((double)num_new + 1.0);
-
-            // Modify deficit:
-            particle_deficit++;
-            node_counts(xx)++;
-          }
-
-          // Adjust weight of parent particle to conserve mass:
-          (*a_p)(jj) = wi/((double)num_new + 1.0);
-
-          // if size of ip_free vanishes, then stop all replication:
-          int num_free = ip_free.size();
-          if (num_free == 0)
-          {
-            ip_free_flag = 1;
-            break;
-          }
-
-          // If deficit becomes +ve, then stop:
-          if (particle_deficit >= 0)
-          {
-            break;
-          }
-        } // particle Loop
-
-        if (particle_deficit != 0)
-        {
-          //abort();
-        }
-
-      } // deficit if
-    } // xx loop
-  } // ll Loop
-
+  } // Replication process
 }

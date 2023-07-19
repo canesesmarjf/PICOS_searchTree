@@ -166,13 +166,8 @@ int main()
 
   // STEP 4:
   // =====================================================================================
-  // Apply vranic method and prioritize smaller nodes first:
+  // Resample distribution:
   // =====================================================================================
-  // This type of script does NOT belong to either the quadtree NOR the vranic method. This is because this process below relies on a collection of quadtrees. Each of those quadtrees is a collection of nodes in velocity space which become the inputs to the vranic downsampling method:
-
-  // NOTE:
-  // I have observed that the KE is not fully conserved using the vranic method. it is conserved to 1e-4, however, on closer inspection, it seems that I need to make a N to 4 vranic method so that we can exactly conserve KE.
-
   particle_tree.resample_distribution();
 
   // Rescale:
@@ -513,66 +508,77 @@ int main()
     }
   }
 
-  return 0;
+  // return 0;
 
 
-  /*
   // STEP 7:
   // =====================================================================================
   // Test clearing data:
   // =====================================================================================
-  // int xx = 12;
-  // quadTree[xx].clear_tree();
+  int xx = 24;
+  particle_tree.quad_tree[xx].clear_tree();
+  // The above effectively only clears the value of p_count. This is becuase everytime we create a new subnode, the values of ip are passed onto the new subnode and ip on the parent node is cleared.
+  // It is quite possible that we do not need to use this function. Instead we could just clear p_count at the same time we clear ip upon creating a new subnode.
 
   // STEP 8:
   // =====================================================================================
   // Test deleting tree and releasing memory:
   // =====================================================================================
-  // quadTree[xx].delete_tree();
+  // Deleting entire binary tree:
+  // particle_tree.binary_tree.delete_nodes();
+
+  // Deleting the xxth quadtree:
+  // particle_tree.quad_tree[xx].delete_tree();
 
   // Re-analize the modified data:
   // ======================================================================
-  // Rescale:
+  // Since we have resampled the data, in order to assess conservation, we need clear contents of trees and re-populate them
+
+  // Normalized data:
   x_p/= x_norm;
   v_p/= y_norm;
-  tree.clear_all();
-  tree.insert_all(x_data);
 
-  // Calculate leaf_x list:
-  // ======================================================================
-  p_count.zeros();
-  leaf_x.clear();
-  for (int xx = 0; xx < Nx ; xx++)
+  // Clear contents of binary tree:
+  particle_tree.binary_tree.clear_all();
+  for (int xx = 0; xx < particle_tree.Nx; xx++)
   {
-   leaf_x[xx] = tree.find(xq(xx));
-   p_count[xx] = leaf_x[xx]->p_count;
+    particle_tree.quad_tree[xx].clear_tree();
   }
 
-  p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
+  // Repopulate trees with resampled data:
+  particle_tree.populate_tree();
+
+  // Save output:
+  particle_tree.p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
 
   // STEP 9:
   // =====================================================================================
   // Assess conservation:
   // =====================================================================================
-  for (int xx = 0; xx < Nx ; xx++)
   {
-    uvec ip = conv_to<uvec>::from(leaf_x[xx]->ip);
-    m_t[xx] = sum(a_p.elem(ip));
-    mat v_p_subset = v_p.rows(ip);
-    p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
-    p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
+    int Nx = particle_tree.Nx;
+    arma::vec m_t(Nx);
+    arma::vec p_x(Nx);
+    arma::vec p_r(Nx);
+    arma::vec KE(Nx);
+    for (int xx = 0; xx < particle_tree.Nx ; xx++)
+    {
+      uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
+      m_t[xx] = sum(a_p.elem(ip));
+      mat v_p_subset = v_p.rows(ip);
+      p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
+      p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
 
-    KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+      KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+    }
+
+    cout << "Total KE after resampling = " + to_string(sum(KE)) << endl;
+
+    m_t.save(root_output + "/" + "m_new_profile" + ".csv",csv_ascii);
+    p_x.save(root_output + "/" + "p_x_new_profile" + ".csv",csv_ascii);
+    p_r.save(root_output + "/" + "p_r_new_profile" + ".csv",csv_ascii);
+    KE.save(root_output + "/" + "KE_new_profile" + ".csv",csv_ascii);
   }
 
-  cout << "Total KE after resampling = " + to_string(sum(KE)) << endl;
-
-  m_t.save(root_output + "/" + "m_new_profile" + ".csv",csv_ascii);
-  p_x.save(root_output + "/" + "p_x_new_profile" + ".csv",csv_ascii);
-  p_r.save(root_output + "/" + "p_r_new_profile" + ".csv",csv_ascii);
-  KE.save(root_output + "/" + "KE_new_profile" + ".csv",csv_ascii);
-
   return 0;
-
-  */
 }

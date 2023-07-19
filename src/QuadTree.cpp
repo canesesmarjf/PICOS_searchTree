@@ -67,14 +67,14 @@ void quadNode_TYP::get_leaf_nodes(vector<quadNode_TYP *> * leafs)
   }
 
   // Determine of node is a leaf;
-  bool is_leaf = true;
+  bool is_leaf_local = true;
   for(int nn = 0; nn < 4; nn++)
   {
-    is_leaf = this->subnode[nn] == NULL && is_leaf;
+    is_leaf_local = this->subnode[nn] == NULL && is_leaf_local;
   }
 
   // If leaf node, accumulate p_count:
-  if (is_leaf == true)
+  if (is_leaf_local == true)
   {
     leafs->push_back(this);
   }
@@ -89,7 +89,7 @@ void quadNode_TYP::delete_nodes()
 {
   for (int nn = 0; nn < 4; nn++)
   {
-    if (this->subnode[nn] != NULL)
+    if (this->subnode[nn] != NULL) // if subnode[nn] exists
     {
       this->subnode[nn]->delete_nodes();
 
@@ -98,12 +98,9 @@ void quadNode_TYP::delete_nodes()
 
       // Prevent dangling pointer:
       this->subnode[nn] = NULL;
-    }
-    else
-    {
-      // Do nothing
-    }
-  }
+
+    } // if
+  } // for
 }
 
 // =======================================================================================
@@ -124,53 +121,57 @@ quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_pa
   this->subnode[1] = NULL;
   this->subnode[2] = NULL;
   this->subnode[3] = NULL;
-  this->subnode_ip.resize(4);
+  this->ip_subnode.resize(4);
   this->p_count = ip.size();
+  this->is_leaf = false;
 }
 
 // =======================================================================================
+/*
 void quadNode_TYP::populate_node()
 {
   // The main advantage of this method relative to the single point insertion method, is that by pre-organizing all points a single level at a time, we can undertand in advance, how many points are to be moved into which subnodes.
   // This can enable us to decide whether or not we would like to proceed with creating new subnodes.
   // In the present case, we are using the depth and the number of particles to decide if we
 
-  // Organize point data into subnode_ip vectors:
+  // Organize point data into ip_subnode vectors:
   for (int ii = 0; ii < p_count; ii++)
   {
     // Get global index:
     uint jj = ip[ii];
 
     // Determine where the current point jj belongs to relative to subnodes:
-    organize_points(jj);
+    calculate_ip_subnode(jj);
   }
 
   // Assess population of each to-be subnode after a minimum depth:
   // int node_count =  p_count;
   std::vector<int> subnode_count(4);
-  int min_count_flag;
+  int accept_new_subnodes;
   if (depth >= quadTree_params->min_depth)
   {
-    min_count_flag = 0;
+    accept_new_subnodes = 0;
     for (int n = 0; n < 4; n++)
     {
-      subnode_count[n] = subnode_ip[n].size();
+      subnode_count[n] = ip_subnode[n].size();
 
       // If at least one subnode has counts > min_count, the proceed with bisection:
       if (subnode_count[n] > quadTree_params->min_count)
       {
-        min_count_flag = 1;
+        accept_new_subnodes = 1;
       }
     }
   }
   else
   {
-    min_count_flag = 1;
+    accept_new_subnodes = 1;
   }
 
-  if (min_count_flag == 1)
+  // Consider what happens when ip_subnode does not lead to new subnodes such as when there are not enough particles. In that case, we may need to clear the content before we move on to the next node
+
+  if (accept_new_subnodes == 1)
   {
-    // Clear ip since they are now distributed in vector subnode_ip:
+    // Clear ip since they are now distributed in vector ip_subnode:
     // Retain p_count, as this tells you how many particles went through this node
     ip.clear();
 
@@ -183,18 +184,21 @@ void quadNode_TYP::populate_node()
 
     for (int ni = 0; ni < 4; ni++)
     {
-      if (subnode_ip[ni].size() > 0)
+      if (ip_subnode[ni].size() > 0)
       {
         // Bounds of new subnode:
         get_subnode_bounds(ni,&min_local,&max_local);
 
         // Create subnode:
-        vector<uint> ip = subnode_ip[ni];
+        vector<uint> ip = ip_subnode[ni];
         subnode[ni] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
 
+        // Clear content of ip_subnode which has already being used:
+        ip_subnode[ni].clear();
+
         // Populate current subnode if it contains enough particles:
-        // bool condition_1 = subnode_ip[ni].size() > quadTree_params->min_count;
-        // bool condition_1 = subnode_ip[ni].size() > 50;
+        // bool condition_1 = ip_subnode[ni].size() > quadTree_params->min_count;
+        // bool condition_1 = ip_subnode[ni].size() > 50;
         bool condition_2 = depth < quadTree_params->max_depth;
         if (condition_2) //|| condition_1)
         {
@@ -202,6 +206,96 @@ void quadNode_TYP::populate_node()
         }
       }
     }
+  }
+
+  return;
+}
+*/
+
+void quadNode_TYP::populate_node()
+{
+
+  // Organize point data into ip_subnode to determine if new subnodes need to be created:
+  // -------------------------------------------------------------------------------------
+  this->calculate_ip_subnode();
+
+  // Run tests to determine if new subnodes are to be accepted:
+  // -------------------------------------------------------------------------------------
+  // Conditionals:
+  bool condition_1 = depth >= quadTree_params->min_depth;
+  bool condition_2 = depth < quadTree_params->max_depth;
+
+  // Reject new subnodes by default:
+  int accept_new_subnodes = 0;
+
+  if (condition_1 == false) // if depth < min_depth, always accept new subnodes:
+  {
+    accept_new_subnodes = 1;
+  }
+  else if (condition_1 && condition_2) // if min_depth <= depth <= max_depth, check counts
+  {
+    // Check if at least one of the new subnodes has counts > min_count:
+    // If so, accept new subnodes
+    for (int n = 0; n < 4; n++)
+    {
+      if (ip_subnode[n].size() > quadTree_params->min_count)
+      {
+        accept_new_subnodes = 1;
+        break;
+      }
+    }
+  }
+  else // if depth > max_depth, always reject subnodes:
+  {
+    accept_new_subnodes = 0;
+  }
+
+  // If accepted, create new subnodes
+  // If not accepted, declare parent node a leaf node
+  // -------------------------------------------------------------------------------------
+  if (accept_new_subnodes == 1)
+  {
+    // Calculate new depth:
+    uint depth = this->depth + 1;
+
+    // Local variables to store bounds of subnodes:
+    vec min_local(2);
+    vec max_local(2);
+
+    for (int ni = 0; ni < 4; ni++)
+    {
+      if (ip_subnode[ni].size() > 0)
+      {
+        // Bounds of new subnode:
+        get_subnode_bounds(ni,&min_local,&max_local);
+
+        // Create subnode:
+        vector<uint> ip = ip_subnode[ni];
+        subnode[ni] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
+
+        // Move in deeper:
+        subnode[ni]->populate_node();
+      }
+    }
+
+  // Clear ip since they have now being distributed amongsnt new subnodes:
+  this->ip.clear();
+  this->p_count = 0;
+  this->is_leaf = false;
+
+  } // if (accept_new_subnodes == 1)
+  else
+  {
+    // Declare node as leaf node
+    this->is_leaf = true;
+    cout << "leaf_node" << endl;
+  }
+
+  // Clear ip_subnode. Data is either not needed OR has been inserted into new subnodes:
+  // -------------------------------------------------------------------------------------
+  for (int n = 0; n < 4; n++)
+  {
+    ip_subnode[n].clear();
   }
 
   return;
@@ -256,7 +350,8 @@ void quadNode_TYP::get_subnode_bounds(int node_index, arma::vec * min_local, arm
 }
 
 // =======================================================================================
-void quadNode_TYP::organize_points(uint jj)
+/*
+void quadNode_TYP::calculate_ip_subnode(uint jj)
 {
   // Objective:
   // insert point jj into a subnode of the current node. Insert a single level only
@@ -278,9 +373,40 @@ void quadNode_TYP::organize_points(uint jj)
   // ========================================
   int node_index = WhichSubNodeDoesItBelongTo(r);
 
-  // Store index jj in corresponding subnode_ip:
+  // Store index jj in corresponding ip_subnode:
   // ========================================
-  subnode_ip[node_index].push_back(jj);
+  ip_subnode[node_index].push_back(jj);
+}
+*/
+
+void quadNode_TYP::calculate_ip_subnode()
+{
+  for (int ii = 0; ii < this->p_count; ii++)
+  {
+    // Get global index:
+    uint jj = this->ip[ii];
+
+    // Current data point:
+    double y = (*v)(jj,0);
+    double z = (*v)(jj,1);
+    arma::vec r = {y,z};
+
+    // Check if data is within node's boundaries:
+    // ========================================
+    if (!IsPointInsideBoundary(r))
+    {
+      cout << "point (" << r[0] << "," << r[1] << ") is out of bounds" << endl;
+      return;
+    }
+
+    // Determine which subnode to insert point:
+    // ========================================
+    int node_index = WhichSubNodeDoesItBelongTo(r);
+
+    // Store index jj in corresponding ip_subnode:
+    // ========================================
+    ip_subnode[node_index].push_back(jj);
+  }
 }
 
 // =======================================================================================
@@ -297,14 +423,14 @@ int quadNode_TYP::count_leaf_points(int k)
   }
 
   // Determine of node is a leaf;
-  bool is_leaf = true;
+  bool is_leaf_local = true;
   for(int nn = 0; nn < 4; nn++)
   {
-    is_leaf = this->subnode[nn] == NULL && is_leaf;
+    is_leaf_local = this->subnode[nn] == NULL && is_leaf_local;
   }
 
   // If leaf node, accumulate p_count:
-  if (is_leaf == true)
+  if (is_leaf_local == true)
   {
     return k + this->p_count;
   }
@@ -328,14 +454,14 @@ void quadNode_TYP::get_all_leafs(vector<quadNode_TYP *>* leaf_v)
   }
 
   // Determine of node is a leaf;
-  bool is_leaf = true;
+  bool is_leaf_local = true;
   for(int nn = 0; nn < 4; nn++)
   {
-    is_leaf = this->subnode[nn] == NULL && is_leaf;
+    is_leaf_local = this->subnode[nn] == NULL && is_leaf_local;
   }
 
   // If leaf node, append its pointer:
-  if (is_leaf == true)
+  if (is_leaf_local == true)
   {
     leaf_v->push_back(this);
     return;
@@ -433,6 +559,7 @@ void quadNode_TYP::clear_node()
 
   this->p_count = 0;
   this->ip.clear();
+  this->is_leaf = false;
 
   for (int nn = 0; nn < 4; nn ++)
   {

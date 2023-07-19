@@ -40,7 +40,7 @@ public:
 
   // Methods:
   void populate_node();
-  void organize_points(uint jj);
+  void calculate_ip_subnode();
   void clear_node();
   void delete_nodes();
   int count_leaf_points(int k);
@@ -60,7 +60,8 @@ private:
   //   +------------------+------------------+
 
   std::vector<quadNode_TYP *> subnode;
-  std::vector<vector<uint>> subnode_ip;
+  std::vector<vector<uint>> ip_subnode;
+  bool is_leaf;
 
   // Methods:
   bool IsPointInsideBoundary(arma::vec r);

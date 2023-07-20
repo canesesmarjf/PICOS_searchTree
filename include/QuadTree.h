@@ -85,7 +85,7 @@ public:
   quadTree_params_TYP * quadTree_params;  // Pointer to tree attributes
 
   // This might need to be removed as it is unused:
-  std::vector<quadNode_TYP *> leaf_v; // List of pointers to leaf nodes
+  // std::vector<quadNode_TYP *> leaf_v; // List of pointers to leaf nodes
 
   // Methods:
   void populate_tree();

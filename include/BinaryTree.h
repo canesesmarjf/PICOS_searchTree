@@ -99,7 +99,9 @@ public:
   // Variables:
   node_TYP * root; // Root node of tree
   tree_params_TYP * tree_params;  // Pointer to tree attributes
-  std::vector<node_TYP *> x_nodes; // List of pointers to leaf nodes on 1st dimension
+
+  // Might need to be deleted:
+  // std::vector<node_TYP *> x_nodes; // List of pointers to leaf nodes on 1st dimension
 
   // Methods:
   void insert_all(vector<arma::vec *> data);

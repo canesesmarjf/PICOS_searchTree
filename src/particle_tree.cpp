@@ -20,9 +20,15 @@ particle_tree_TYP::particle_tree_TYP(tree_params_TYP * binary_tree_params, quadT
   // Create x dimension query grid for binary_tree:
   this->create_x_query_grid();
 
-  // Set capacity of quad trees for v dimension:
-  // quad_tree.reserve(this->Nx);
+  // Create vector of data EMPTY quad trees:
+  for (int xx = 0; xx < this->Nx; xx++)
+  {
+    // Empty data for quadtree:
+    vector<uint> ip;
 
+    // Create quadtree with overloaded constructor:
+    quad_tree.emplace_back(quad_tree_params,ip,this->v_p);
+  }
 }
 
 // vector<particle_tree_TYP> IONS_tree;
@@ -73,25 +79,29 @@ void particle_tree_TYP::get_mean_p_count()
 // ======================================================================================
 void particle_tree_TYP::assemble_quad_tree_vector()
 {
-  for (int xx = 0; xx < leaf_x.size() ; xx++)
+  for (int xx = 0; xx < this->Nx ; xx++)
   {
-    // Create quadtree[xx] only if leaf_x[xx] is surplus:
+    // Calculate surplus or deficit of p_count profile:
     int delta_p_count = p_count[xx] - mean_p_count;
+
+    // Populate quadtree[xx] only if leaf_x[xx] is surplus
     if (delta_p_count > 0)
     {
       // Data for quadtree:
       vector<uint> ip = leaf_x[xx]->ip;
 
-      // Create quadtree:
-      quad_tree.emplace_back(quad_tree_params,ip,v_p);
+      // Populate quadtree:
+      quad_tree[xx].root->ip = ip;
+      quad_tree[xx].root->p_count = ip.size();
+      // quad_tree.emplace_back(quad_tree_params,ip,v_p);
 
       // Populate quadtree:
       quad_tree[xx].populate_tree();
     }
-    else
-    {
-      quad_tree.emplace_back();
-    }
+    // else
+    // {
+    //   // quad_tree.emplace_back();
+    // }
   }
 }
 

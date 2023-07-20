@@ -9,7 +9,7 @@ quadTree_TYP::quadTree_TYP()
 {
   this->quadTree_params = NULL;
   root = NULL;
-  leaf_v = {NULL};
+  // leaf_v = {NULL};
 }
 
 // =======================================================================================
@@ -313,10 +313,10 @@ void quadNode_TYP::populate_node()
         else // subnode[n] already exists:
         {
           // consider a method called update_subnode(n,ip)
-          
+
           // Update node "data" attributes of the subnode:
           subnode[n]->ip = ip_local;
-          subnode[n]->p_count = ip.size();
+          subnode[n]->p_count = ip_local.size();
           subnode[n]->is_leaf = false;
         }
 
@@ -325,13 +325,12 @@ void quadNode_TYP::populate_node()
       }
     } // end, for loop
 
-  // Clear ip on parent node since they have now being distributed amongsnt new subnodes:
-  this->ip.clear();
-  this->p_count = 0;
+    // Clear ip on parent node since they have now being distributed amongsnt new subnodes:
+    this->ip.clear();
+    this->p_count = 0;
 
-  // Label parent node as NOT a leaf node:
-  this->is_leaf = false;
-
+    // Label parent node as NOT a leaf node:
+    this->is_leaf = false;
   }
   else
   {

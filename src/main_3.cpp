@@ -147,7 +147,7 @@ int main()
     for (int xx = 0; xx < particle_tree.Nx; xx++)
     {
       qt_count[xx] = particle_tree.quad_tree[xx].count_leaf_points();
-      if (particle_tree.quad_tree[xx].root != NULL)
+      if (particle_tree.leaf_v[xx][0] != NULL)
         bt_count[xx] = particle_tree.p_count[xx];
     }
 
@@ -254,7 +254,7 @@ int main()
   // =====================================================================================
   // Since we have resampled the data, in order to assess conservation, we need clear contents of trees and re-populate them
 
-  // Clear contents of binary tree:
+  // Clear contents of particle tree:
   particle_tree.binary_tree.clear_all();
   for (int xx = 0; xx < particle_tree.Nx; xx++)
   {
@@ -314,20 +314,27 @@ int main()
 
   // STEP XX:
   // =====================================================================================
-  // Test clearing data:
+  // Check for memory leaks when reusing particle_tree after a data clear:
   // =====================================================================================
 
-  // Clear contents of binary tree:
+  // Clear contents of tree:
   particle_tree.binary_tree.clear_all();
-
-  // Clear contents of quad tree:
   for (int xx = 0; xx < particle_tree.Nx; xx++)
   {
     particle_tree.quad_tree[xx].clear_tree();
   }
 
-  // The above effectively only clears the value of p_count. This is becuase everytime we create a new subnode, the values of ip are passed onto the new subnode and ip on the parent node is cleared.
-  // It is quite possible that we do not need to use this function. Instead we could just clear p_count at the same time we clear ip upon creating a new subnode.
+  // Load a new data set:
+  x_p.load(input_file_name_1,csv_ascii);
+  v_p.load(input_file_name_2,csv_ascii);
+  a_p.load(input_file_name_3,csv_ascii);
+
+  // Normalize data:
+  x_p = x_p/x_norm;
+  v_p = v_p/y_norm;
+  
+  // Repopulate trees with new data:
+  particle_tree.populate_tree();
 
   /*
   // STEP XX:

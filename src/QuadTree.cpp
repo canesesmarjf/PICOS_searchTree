@@ -114,16 +114,25 @@ void quadNode_TYP::delete_nodes()
 }
 
 // =======================================================================================
+// Overloaded constructor:
 quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_params_TYP * quadTree_params,std::vector<uint> ip, arma::mat * v)
 {
-  // Node attributes:
-  this->center  = (min + max)/2;
+  // Node "natural" attributes:
   this->min     = min;
   this->max     = max;
   this->depth   = depth;
   this->quadTree_params = quadTree_params;
+
+  // Node "data" attributes:
   this->ip = ip;
   this->v  = v;
+
+  // Derived node "natural" attributes:
+  this->center  = (min + max)/2;
+
+  // Derived "data" attributes:
+  this->p_count = ip.size();
+  this->is_leaf = false;
 
   // Allocate memory for subnodes:
   this->subnode.reserve(4);
@@ -132,8 +141,6 @@ quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_pa
   this->subnode[2] = NULL;
   this->subnode[3] = NULL;
   this->ip_subnode.resize(4);
-  this->p_count = ip.size();
-  this->is_leaf = false;
 }
 
 // =======================================================================================
@@ -263,55 +270,72 @@ void quadNode_TYP::populate_node()
   // Organize point data into ip_subnode to determine if new subnodes need to be created:
   // -------------------------------------------------------------------------------------
   // Propose new subnodes
-  this->calculate_ip_subnode();
+  calculate_ip_subnode();
 
   // Run tests to determine if new subnodes are to be accepted:
   // -------------------------------------------------------------------------------------
   // Do we accept new proposed subnodes?
-  int accept_new_subnodes = this->apply_conditionals_ip_subnode();
+  int accept_new_subnodes = apply_conditionals_ip_subnode();
 
   // If accepted, create populate subnodes or create them if they dont exist
   // If not accepted, declare parent node a leaf node
   // -------------------------------------------------------------------------------------
   if (accept_new_subnodes == 1)
   {
-    // Calculate new depth:
-    uint depth = this->depth + 1;
+    // Loop over proposed subnodes.
+    // if ip_subnode[n] is not empty, do the following
+    // If they already exist, just update subnode[n].ip variable
+    // If they dont exist, create them using the new operator
 
-    // Local variables to store bounds of subnodes:
-    vec min_local(2);
-    vec max_local(2);
-
+    // Loop over proposed subnodes:
     for (int n = 0; n < 4; n++)
     {
+      // Check that proposed subnode has data:
       if (ip_subnode[n].size() > 0)
       {
-        // Need to consider what happens if subnodes already exist.
-        // If so, how do we pass the ip_subnode[n] data?
+        // Index data to push into the new subnode[n]:
+        vector<uint> ip_local = ip_subnode[n];
 
-        // Bounds of new subnode:
-        get_subnode_bounds(n,&min_local,&max_local);
+        // Create new subnode if it doesnt exist:
+        if (subnode[n] == NULL)
+        {
+          // Could consider creating a method called create_subnode(n,ip)
 
-        // Create subnode:
-        vector<uint> ip = ip_subnode[n];
-        subnode[n] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip,v);
+          // Bounds of new subnode:
+          vec min_local(2);
+          vec max_local(2);
+          get_subnode_bounds(n,&min_local,&max_local);
+
+          // Create subnode:
+          uint depth = this->depth + 1;
+          subnode[n] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip_local,v);
+        }
+        else // subnode[n] already exists:
+        {
+          // consider a method called update_subnode(n,ip)
+          
+          // Update node "data" attributes of the subnode:
+          subnode[n]->ip = ip_local;
+          subnode[n]->p_count = ip.size();
+          subnode[n]->is_leaf = false;
+        }
 
         // Move in deeper:
         subnode[n]->populate_node();
       }
-    }
+    } // end, for loop
 
-  // Clear ip since they have now being distributed amongsnt new subnodes:
+  // Clear ip on parent node since they have now being distributed amongsnt new subnodes:
   this->ip.clear();
   this->p_count = 0;
 
-  // Label node is NOT a leaf node:
+  // Label parent node as NOT a leaf node:
   this->is_leaf = false;
 
   }
   else
   {
-    // Declare node as leaf node
+    // Declare parent node as leaf node
     this->is_leaf = true;
     cout << "leaf_node" << endl;
   }

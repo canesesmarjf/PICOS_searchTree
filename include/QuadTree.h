@@ -23,12 +23,12 @@ public:
 class quadNode_TYP
 {
 public:
-  // Data variables:
+  // Node "data" attributes:
   int p_count;            // Number of points indexed in the current node
   std::vector<uint> ip;   // Indices of data appended to this node
   arma::mat *v;           // Pointer to data to be indexed
 
-  // Node parameters:
+  // Node "natural" attributes:
   uint depth;
   arma::vec min;
   arma::vec max;

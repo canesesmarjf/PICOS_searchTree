@@ -4,6 +4,14 @@
 using namespace std;
 
 // =======================================================================================
+binaryTree_TYP::binaryTree_TYP()
+{
+  // All pointers must be made NULL:
+  this->tree_params = NULL;
+  root = NULL;
+}
+
+// =======================================================================================
 binaryTree_TYP::binaryTree_TYP(tree_params_TYP * tree_params)
 {
   // Update tree_params:

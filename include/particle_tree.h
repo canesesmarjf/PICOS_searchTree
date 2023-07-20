@@ -24,7 +24,7 @@ public:
   arma::vec * x_p; // Pointer to particle x data
   arma::mat * v_p; // Pointer to particle v data
   arma::mat * a_p; // Pointer to particle weight data
-  int Nx; // Number of x-nodes on binary tree
+  // int Nx; // Number of x-nodes on binary tree
   arma::vec xq; // x query grid
 
   // Variables:

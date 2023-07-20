@@ -44,7 +44,6 @@ public:
   void clear_node();
   void delete_nodes();
   int count_leaf_points(int k);
-  void get_all_leafs(vector<quadNode_TYP *> *);
   void get_subnode_bounds(int node_index, arma::vec * min_l, arma::vec * max_l);
   void get_leaf_nodes(vector<quadNode_TYP *> * leafs);
 
@@ -84,9 +83,6 @@ public:
   quadNode_TYP * root; // Root node of tree
   quadTree_params_TYP * quadTree_params;  // Pointer to tree attributes
 
-  // This might need to be removed as it is unused:
-  // std::vector<quadNode_TYP *> leaf_v; // List of pointers to leaf nodes
-
   // Methods:
   void populate_tree();
   void clear_tree();
@@ -105,6 +101,5 @@ private:
   // void assemble_node_list();
   // void save_data(int ii, string prefix);
 };
-
 
 #endif

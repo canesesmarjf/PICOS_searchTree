@@ -72,13 +72,14 @@ public:
 private:
   // Variables:
   tree_params_TYP * tree_params; // Pointer to tree parameters
+  std::vector<node_TYP *> subnode;
 
   // Subnodes within this node:
   // subnode[0] : right_node
   // subnode[1] : left_node
   //   +------------------+------------------+
   //   |  left_node = 1   |  right_node = 0  |
-  std::vector<node_TYP *> subnode;
+  //   +------------------+------------------+
 
   // Methods:
   bool IsPointInsideBoundary(double p, int dim);
@@ -93,15 +94,12 @@ class binaryTree_TYP
 {
 public:
   // Constructor:
-  binaryTree_TYP(){};
+  binaryTree_TYP();
   binaryTree_TYP(tree_params_TYP * tree_params);
 
   // Variables:
   node_TYP * root; // Root node of tree
   tree_params_TYP * tree_params;  // Pointer to tree attributes
-
-  // Might need to be deleted:
-  // std::vector<node_TYP *> x_nodes; // List of pointers to leaf nodes on 1st dimension
 
   // Methods:
   void insert_all(vector<arma::vec *> data);
@@ -112,19 +110,8 @@ public:
   int count_leaf_points();
   void delete_nodes();
 
-  // int get_num_nodes();
-  // arma::vec get_node_centers();
-  // int get_max_depth();
-  // void print_info(int ii);
-  // void save_data_all(string prefix);
-
 private:
-  // Variables:
-  // node_TYP * root; // Root node of tree
 
-  // Methods:
-  // void assemble_node_list();
-  // void save_data(int ii, string prefix);
 };
 
 #endif

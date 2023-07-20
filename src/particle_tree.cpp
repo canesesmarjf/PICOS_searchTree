@@ -14,21 +14,26 @@ particle_tree_TYP::particle_tree_TYP(tree_params_TYP * binary_tree_params, quadT
   this->v_p = v_p;
   this->a_p = a_p;
 
-  // Create instance of binary tree for x dimension:
+  // Instance of binary tree for x dimension:
   binary_tree = binaryTree_TYP(binary_tree_params);
+
+  // Instance of quad tree vector, one for each node of binary tree:
+  int Nx = binary_tree_params->num_nodes;
+  quad_tree.resize(Nx);
+  // for (int xx = 0; xx < Nx; xx++)
+  //   quad_tree[xx].root = NULL;
+
+  // Allocate memory and resize leaf_x and leaf_v:
+  leaf_v.resize(Nx);
+  leaf_x.resize(Nx);
+  for (int xx = 0; xx < Nx; xx++)
+    leaf_x[xx] = NULL;
 
   // Create x dimension query grid for binary_tree:
   this->create_x_query_grid();
 
-  // Create vector of data EMPTY quad trees:
-  for (int xx = 0; xx < this->Nx; xx++)
-  {
-    // Empty data for quadtree:
-    vector<uint> ip;
-
-    // Create quadtree with overloaded constructor:
-    quad_tree.emplace_back(quad_tree_params,ip,this->v_p);
-  }
+  // Allocate memory and resize p_count:
+  p_count = zeros<ivec>(Nx);
 }
 
 // vector<particle_tree_TYP> IONS_tree;
@@ -38,26 +43,21 @@ particle_tree_TYP::particle_tree_TYP(tree_params_TYP * binary_tree_params, quadT
 void particle_tree_TYP::create_x_query_grid()
 {
   // Number of x grid nodes:
-  this->Nx = pow(2,binary_tree_params->max_depth[0]);
+  int Nx = pow(2,binary_tree_params->max_depth[0]);
 
   // Calculate total length and node length in x-space:
   double Lx = binary_tree_params->max[0] - binary_tree_params->min[0];
   double dx = Lx/Nx;
 
-  // create query grid:
+  // Create query grid:
   this->xq = binary_tree_params->min[0] + dx/2 + regspace(0,Nx-1)*dx;
 }
 
 // ======================================================================================
 void particle_tree_TYP::calculate_leaf_x()
 {
-  // Allocate memory and resize leaf_x:
-  leaf_x.resize(Nx);
-
-  // Allocate memory and resize p_count:
-  p_count = arma::zeros<arma::ivec>(Nx);
-
   // Assemble leaf_x and p_count:
+  int Nx = binary_tree_params->num_nodes;
   for (int xx = 0; xx < Nx ; xx++)
   {
    leaf_x[xx] = binary_tree.find(xq(xx));
@@ -72,6 +72,7 @@ void particle_tree_TYP::get_mean_p_count()
   // 1- Cast numerator as a double so that division retains fractional part
   // 2- Round UP to the nearest LARGEST integer so as to over-estimate total number of particles. We later test for total particle usage to avoid "out of bounds" access.
 
+  int Nx = binary_tree_params->num_nodes;
   int p_count_sum = sum(p_count);
   mean_p_count = ceil((double)p_count_sum/Nx);
 }
@@ -79,7 +80,8 @@ void particle_tree_TYP::get_mean_p_count()
 // ======================================================================================
 void particle_tree_TYP::assemble_quad_tree_vector()
 {
-  for (int xx = 0; xx < this->Nx ; xx++)
+  int Nx = binary_tree_params->num_nodes;
+  for (int xx = 0; xx < Nx ; xx++)
   {
     // Calculate surplus or deficit of p_count profile:
     int delta_p_count = p_count[xx] - mean_p_count;
@@ -91,55 +93,29 @@ void particle_tree_TYP::assemble_quad_tree_vector()
       vector<uint> ip = leaf_x[xx]->ip;
 
       // Populate quadtree:
-      quad_tree[xx].root->ip = ip;
-      quad_tree[xx].root->p_count = ip.size();
-      // quad_tree.emplace_back(quad_tree_params,ip,v_p);
+      quad_tree[xx] = quadTree_TYP(quad_tree_params,ip,this->v_p);
 
       // Populate quadtree:
       quad_tree[xx].populate_tree();
     }
-    // else
-    // {
-    //   // quad_tree.emplace_back();
-    // }
   }
 }
 
 // ======================================================================================
 void particle_tree_TYP::calculate_leaf_v()
 {
-  // Allocate memory and resize leaf_v:
-  leaf_v.resize(Nx);
-
   for (int xx = 0; xx < leaf_x.size() ; xx++)
   {
     // Create quadtree[xx] only if leaf_x[xx] is surplus:
     int delta_p_count = p_count[xx] - mean_p_count;
     if (delta_p_count > 0)
     {
-      cout << "hello 2" << endl;
-
       // Extract all leaf nodes:
       leaf_v[xx] = quad_tree[xx].get_leaf_nodes();
-
-      // Diagnostics:
-      if (false)
-      {
-      int sum = 0;
-      for(int ll = 0; ll < leaf_v[xx].size(); ll++)
-        sum = sum + leaf_v[xx][ll]->p_count;
-      int ip_count = quad_tree[xx].root->count_leaf_points(0);
-
-      cout << "p_count[xx] = " << p_count[xx] << endl;
-      cout << "ip_count = " << ip_count << endl;
-      cout << "sum = " << sum << endl;
-      }
-
     }
     else
     {
       leaf_v[xx] = {NULL};
-      cout << "hello:" << endl;
     }
   }
 }
@@ -330,6 +306,7 @@ void particle_tree_TYP::resample_distribution()
     int particle_deficit;
 
     // Vector to keep track of particle counts in nodes:
+    int Nx = leaf_x.size();
     ivec node_counts(Nx);
     for (int xx = 0; xx < Nx; xx++)
       node_counts(xx) = leaf_x[xx]->p_count;

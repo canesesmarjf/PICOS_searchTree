@@ -87,30 +87,30 @@ int main()
 
   // 1D binary tree parameters:
   // -------------------------------------------------------------------------------------
-  tree_params_TYP tree_params;
+  tree_params_TYP bt_params;
 
-  tree_params.dimensionality = 1;
-  tree_params.min       = {-1};
-  tree_params.max       = {+1};
-  tree_params.max_depth = {+6};
+  bt_params.dimensionality = 1;
+  bt_params.min       = {-1};
+  bt_params.max       = {+1};
+  bt_params.max_depth = {+6};
 
   // 2D Quadtree parameters:
   // -------------------------------------------------------------------------------------
-  quadTree_params_TYP quadTree_params;
+  quadTree_params_TYP qt_params;
 
-  quadTree_params.min = {-1,-1};
-  quadTree_params.max = {+1,+1};
+  qt_params.min = {-1,-1};
+  qt_params.max = {+1,+1};
   if (species_index == "1")
   {
-    quadTree_params.min_depth = +5;
-    quadTree_params.max_depth = +6;
-    quadTree_params.min_count = 7;
+    qt_params.min_depth = +5;
+    qt_params.max_depth = +6;
+    qt_params.min_count = 7;
   }
   else if (species_index == "2")
   {
-    quadTree_params.min_depth = +5;
-    quadTree_params.max_depth = +6;
-    quadTree_params.min_count = 7;
+    qt_params.min_depth = +5;
+    qt_params.max_depth = +6;
+    qt_params.min_count = 7;
   }
 
   // STEP 3:
@@ -119,7 +119,8 @@ int main()
   // =====================================================================================
   // Create composite particle tree:
   // -------------------------------------------------------------------------------------
-  particle_tree_TYP particle_tree(&tree_params,&quadTree_params,&x_p,&v_p,&a_p);
+  particle_tree_TYP particle_tree(&bt_params,&qt_params,&x_p,&v_p,&a_p);
+  int Nx = bt_params.num_nodes;
 
   // Populate particle tree with data:
   // -------------------------------------------------------------------------------------
@@ -142,9 +143,9 @@ int main()
   // Quad tree diagnostics:
   // -------------------------------------------------------------------------------------
   {
-    vec qt_count = zeros<vec>(particle_tree.Nx);
-    vec bt_count = zeros<vec>(particle_tree.Nx);
-    for (int xx = 0; xx < particle_tree.Nx; xx++)
+    vec qt_count = zeros<vec>(Nx);
+    vec bt_count = zeros<vec>(Nx);
+    for (int xx = 0; xx < Nx; xx++)
     {
       qt_count[xx] = particle_tree.quad_tree[xx].count_leaf_points();
       if (particle_tree.leaf_v[xx][0] != NULL)
@@ -161,7 +162,6 @@ int main()
   // Assess conservation:PRIOR TO RESAMPLING
   // =====================================================================================
   {
-    int Nx = particle_tree.Nx;
     arma::vec m_t(Nx);
     arma::vec p_x(Nx);
     arma::vec p_r(Nx);
@@ -217,7 +217,7 @@ int main()
   // We can visually inspect of the particle count, coordinate and dimensions of the node match the observed number of particles in that region based on the particle data.
 
   // Save data to postprocess tree:
-  for (int xx = 0; xx < particle_tree.leaf_x.size() ; xx++)
+  for (int xx = 0; xx < Nx ; xx++)
   {
     if (particle_tree.leaf_v[xx][0] != NULL)
     {
@@ -256,7 +256,7 @@ int main()
 
   // Clear contents of particle tree:
   particle_tree.binary_tree.clear_all();
-  for (int xx = 0; xx < particle_tree.Nx; xx++)
+  for (int xx = 0; xx < Nx; xx++)
   {
     particle_tree.quad_tree[xx].clear_tree();
   }
@@ -284,12 +284,11 @@ int main()
   // Assess conservation: AFTER RESAMPLING
   // =====================================================================================
   {
-    int Nx = particle_tree.Nx;
     arma::vec m_t(Nx);
     arma::vec p_x(Nx);
     arma::vec p_r(Nx);
     arma::vec KE(Nx);
-    for (int xx = 0; xx < particle_tree.Nx ; xx++)
+    for (int xx = 0; xx < Nx ; xx++)
     {
       uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
       m_t[xx] = sum(a_p.elem(ip));
@@ -319,7 +318,7 @@ int main()
 
   // Clear contents of tree:
   particle_tree.binary_tree.clear_all();
-  for (int xx = 0; xx < particle_tree.Nx; xx++)
+  for (int xx = 0; xx < Nx; xx++)
   {
     particle_tree.quad_tree[xx].clear_tree();
   }
@@ -332,49 +331,29 @@ int main()
   // Normalize data:
   x_p = x_p/x_norm;
   v_p = v_p/y_norm;
-  
+
   // Repopulate trees with new data:
   particle_tree.populate_tree();
 
-  /*
   // STEP XX:
   // =====================================================================================
-  // Test deleting tree and releasing memory:
+  // Resample distribution:
   // =====================================================================================
-  // Deleting entire binary tree:
-  // particle_tree.binary_tree.delete_nodes();
+  particle_tree.resample_distribution();
 
-  // Deleting the xxth quadtree:
-  // particle_tree.quad_tree[xx].delete_tree();
+  // STEP XX:
+  // =====================================================================================
+  // Save resampled distribution to file:
+  // =====================================================================================
+  // Rescale:
+  x_p*= x_norm;
+  v_p*= y_norm;
 
-  // Re-analize the data to test reusing tree infrastructure:
-  // ======================================================================
-  // Since we have resampled the data, in order to assess conservation, we need clear contents of trees and re-populate them
-
-  // Clear contents of binary tree:
-  particle_tree.binary_tree.clear_all();
-  for (int xx = 0; xx < particle_tree.Nx; xx++)
-  {
-    particle_tree.quad_tree[xx].clear_tree();
-  }
-
-  // Load a new data set:
-  x_p.load(input_file_name_1,csv_ascii);
-  v_p.load(input_file_name_2,csv_ascii);
-  a_p.load(input_file_name_3,csv_ascii);
-
-  // Normalize data:
-  x_p = x_p/x_norm;
-  v_p = v_p/y_norm;
-
-  // Repopulate trees with resampled data:
-  particle_tree.populate_tree();
-
-  // Save output:
-  particle_tree.p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
-
-  */
-
+  // Save resampled distribution for post-processing
+  format = arma::csv_ascii;
+  x_p.save(root_output + "/"  + "x_p_new2.csv",csv_ascii);
+  v_p.save(root_output + "/"  + "v_p_new2.csv",csv_ascii);
+  a_p.save(root_output + "/"  + "a_p_new2.csv",csv_ascii);
 
   return 0;
 }

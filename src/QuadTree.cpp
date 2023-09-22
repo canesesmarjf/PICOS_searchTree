@@ -142,16 +142,20 @@ int q_node_TYP::apply_conditionals_ip_subnode()
   int max_depth = qt_params->max_depth;
   int min_count = qt_params->min_count;
 
+  // Node depths
+  int parent_node_depth = this->depth;
+  int subnode_depth = parent_node_depth + 1;
+
   // Reject new subnodes by default:
   int accept_new_subnodes = 0;
 
-  // Determine in which of 3 state the node is in:
+  // Determine in which of 3 state the subnode will be in:
   int state;
-  if (depth <= min_depth-1)
+  if (subnode_depth <= min_depth)
   {
     state = 1;
   }
-  else if (depth > max_depth-1)
+  else if (subnode_depth > max_depth)
   {
     state = 3;
   }
@@ -163,13 +167,13 @@ int q_node_TYP::apply_conditionals_ip_subnode()
   // Compute result based on state:
   switch(state)
   {
-    case 1: // depth < min_depth
+    case 1: // subnode_depth <= min_depth
       accept_new_subnodes = 1;
       break;
-    case 3: // depth > max_depth
+    case 3: // subnode_depth > max_depth
       accept_new_subnodes = 0;
       break;
-    case 2: // depth is between [min_depth, max_depth].
+    case 2: // subnode_depth is between [min_depth, max_depth].
       // Default:
       accept_new_subnodes = 0;
 
@@ -184,35 +188,6 @@ int q_node_TYP::apply_conditionals_ip_subnode()
       }
       break;
   }
-
-  // // Conditionals:
-  // bool condition_1 = depth >= qt_params->min_depth;
-  // bool condition_2 = depth < qt_params->max_depth;
-  //
-  // // Reject new subnodes by default:
-  // int accept_new_subnodes = 0;
-  //
-  // if (condition_1 == false) // if depth < min_depth, always accept new subnodes:
-  // {
-  //   accept_new_subnodes = 1;
-  // }
-  // else if (condition_1 && condition_2) // if depth is between [min_depth, max_depth], accept new subnodes if at least ONE of them has enough particles (> min_count)
-  // {
-  //   // Check if at least one of the new subnodes has counts > min_count:
-  //   // If so, accept new subnodes
-  //   for (int n = 0; n < 4; n++)
-  //   {
-  //     if (ip_subnode[n].size() > qt_params->min_count)
-  //     {
-  //       accept_new_subnodes = 1;
-  //       break;
-  //     }
-  //   }
-  // }
-  // else // if depth > max_depth, always reject subnodes:
-  // {
-  //   accept_new_subnodes = 0;
-  // }
 
   return accept_new_subnodes;
 }

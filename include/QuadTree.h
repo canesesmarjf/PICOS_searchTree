@@ -49,6 +49,7 @@ public:
   void get_leaf_nodes(vector<q_node_TYP *> * leafs);
   void create_subnode(int n, vector<uint> ip);
   void update_subnode(int n,vector<uint> ip);
+  void clear_ip_subnode();
 
 private:
   // Variables:

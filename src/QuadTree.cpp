@@ -137,34 +137,82 @@ q_node_TYP::q_node_TYP(vec min, vec max, uint depth, qt_params_TYP * qt_params,v
 // =======================================================================================
 int q_node_TYP::apply_conditionals_ip_subnode()
 {
-  // Conditionals:
-  bool condition_1 = depth >= qt_params->min_depth;
-  bool condition_2 = depth < qt_params->max_depth;
+  // Tree parameters:
+  int min_depth = qt_params->min_depth;
+  int max_depth = qt_params->max_depth;
+  int min_count = qt_params->min_count;
 
   // Reject new subnodes by default:
   int accept_new_subnodes = 0;
 
-  if (condition_1 == false) // if depth < min_depth, always accept new subnodes:
+  // Determine in which of 3 state the node is in:
+  int state;
+  if (depth <= min_depth-1)
   {
-    accept_new_subnodes = 1;
+    state = 1;
   }
-  else if (condition_1 && condition_2) // if depth is between [min_depth, max_depth], accept new subnodes if at least ONE of them has enough particles (> min_count)
+  else if (depth > max_depth-1)
   {
-    // Check if at least one of the new subnodes has counts > min_count:
-    // If so, accept new subnodes
-    for (int n = 0; n < 4; n++)
-    {
-      if (ip_subnode[n].size() > qt_params->min_count)
+    state = 3;
+  }
+  else
+  {
+    state = 2;
+  }
+
+  // Compute result based on state:
+  switch(state)
+  {
+    case 1: // depth < min_depth
+      accept_new_subnodes = 1;
+      break;
+    case 3: // depth > max_depth
+      accept_new_subnodes = 0;
+      break;
+    case 2: // depth is between [min_depth, max_depth].
+      // Default:
+      accept_new_subnodes = 0;
+
+      // Accept new subnodes if at least ONE of them has enough particles (> min_count)
+      for (int n = 0; n < 4; n++)
       {
-        accept_new_subnodes = 1;
-        break;
+        if (ip_subnode[n].size() > min_count)
+        {
+          accept_new_subnodes = 1;
+          break; // Break out of loop
+        }
       }
-    }
+      break;
   }
-  else // if depth > max_depth, always reject subnodes:
-  {
-    accept_new_subnodes = 0;
-  }
+
+  // // Conditionals:
+  // bool condition_1 = depth >= qt_params->min_depth;
+  // bool condition_2 = depth < qt_params->max_depth;
+  //
+  // // Reject new subnodes by default:
+  // int accept_new_subnodes = 0;
+  //
+  // if (condition_1 == false) // if depth < min_depth, always accept new subnodes:
+  // {
+  //   accept_new_subnodes = 1;
+  // }
+  // else if (condition_1 && condition_2) // if depth is between [min_depth, max_depth], accept new subnodes if at least ONE of them has enough particles (> min_count)
+  // {
+  //   // Check if at least one of the new subnodes has counts > min_count:
+  //   // If so, accept new subnodes
+  //   for (int n = 0; n < 4; n++)
+  //   {
+  //     if (ip_subnode[n].size() > qt_params->min_count)
+  //     {
+  //       accept_new_subnodes = 1;
+  //       break;
+  //     }
+  //   }
+  // }
+  // else // if depth > max_depth, always reject subnodes:
+  // {
+  //   accept_new_subnodes = 0;
+  // }
 
   return accept_new_subnodes;
 }
@@ -183,12 +231,21 @@ void q_node_TYP::create_subnode(int n, vector<uint> ip)
 }
 
 // =======================================================================================
-void q_node_TYP:: update_subnode(int n,vector<uint> ip)
+void q_node_TYP::update_subnode(int n,vector<uint> ip)
 {
   // Update node "data" attributes of the subnode which alread exists:
   subnode[n]->ip = ip;
   subnode[n]->ip_count = ip.size();
   subnode[n]->is_leaf = false;
+}
+
+// =======================================================================================
+void q_node_TYP::clear_ip_subnode()
+{
+  for (int n = 0; n < 4; n++)
+  {
+    ip_subnode[n].clear();
+  }
 }
 
 // =======================================================================================
@@ -207,11 +264,23 @@ void q_node_TYP::populate_subnodes()
   // Do we accept new proposed subnodes?
   int accept_new_subnodes = apply_conditionals_ip_subnode();
 
-  // If accepted, populate subnodes or create them if they dont exist
   // If not accepted, declare parent node a leaf node
+  // -------------------------------------------------------------------------------------
+  if (accept_new_subnodes == 0)
+  {
+    // Declare parent node as a leaf node:
+    this->is_leaf = true;
+    cout << "leaf_node" << endl;
+  }
+
+  // If accepted, populate subnodes
+  // If they dont exist yet, create them:
   // -------------------------------------------------------------------------------------
   if (accept_new_subnodes == 1)
   {
+    // Declare parent node as NOT a leaf node:
+    this->is_leaf = false;
+
     // Loop over proposed subnodes.
     // if ip_subnode[n] is not empty, do the following
     // If they already exist, just update subnode[n].ip variable
@@ -223,23 +292,14 @@ void q_node_TYP::populate_subnodes()
       // Check that proposed subnode has data:
       if (ip_subnode[n].size() > 0)
       {
-        // Index data to push into the new subnode[n]:
-        vector<uint> ip_local = ip_subnode[n];
-
         // Create new subnode if it doesnt exist:
         if (subnode[n] == NULL)
         {
-          create_subnode(n,ip_local);
+          create_subnode(n,ip_subnode[n]);
         }
         else // subnode[n] already exists:
         {
-          // consider a method called
-          update_subnode(n,ip_local);
-
-          // // Update node "data" attributes of the subnode:
-          // subnode[n]->ip = ip_local;
-          // subnode[n]->ip_count = ip_local.size();
-          // subnode[n]->is_leaf = false;
+          update_subnode(n,ip_subnode[n]);
         }
 
         // Move in deeper:
@@ -250,23 +310,11 @@ void q_node_TYP::populate_subnodes()
     // Clear ip on parent node since they have now being distributed amongsnt new subnodes:
     this->ip.clear();
     this->ip_count = 0;
-
-    // Label parent node as NOT a leaf node:
-    this->is_leaf = false;
-  }
-  else
-  {
-    // Declare parent node as leaf node
-    this->is_leaf = true;
-    cout << "leaf_node" << endl;
   }
 
   // Clear ip_subnode. Data is either not needed OR has been inserted into new subnodes:
   // -------------------------------------------------------------------------------------
-  for (int n = 0; n < 4; n++)
-  {
-    ip_subnode[n].clear();
-  }
+  clear_ip_subnode();
 
   return;
 }

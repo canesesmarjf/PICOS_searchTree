@@ -34,10 +34,6 @@ int main()
   string time_index    = "50"; // tt
   string scenario      = "ss_" + species_index + "_tt_" + time_index;
 
-  // Choose the input data:
-  // =====================================================================================
-  string root_input = "./Step_1_output/";
-
   // Folder where output data is to be stored:
   // =====================================================================================
   string root_output = "./Step_2_output/" + picos_case + "/" + scenario;
@@ -50,6 +46,10 @@ int main()
   {
     fs::create_directories(root_output);
   }
+
+  // Choose the input data:
+  // =====================================================================================
+  string root_input = "./Step_1_output/";
 
   // STEP 1:
   // =====================================================================================
@@ -311,10 +311,16 @@ int main()
 
   // We now need to demonstrate that we can clear the tree data, release the tree memory with a delete function and reuse the tree without incurring into memory leaks
 
-  // STEP XX:
+  // STEP 10:
   // =====================================================================================
   // Check for memory leaks when reusing particle_tree after a data clear:
   // =====================================================================================
+  // Substeps are the following:
+  // - Clear contents of particle_tree:
+  // - Load in new data to x_p, v_p, a_p
+  // - Normalize data and populate tree
+  // - Resample distribution
+  // - Rescale data and save results
 
   // Clear contents of tree:
   particle_tree.binary_tree.clear_all();
@@ -324,6 +330,15 @@ int main()
   }
 
   // Load a new data set:
+  // Choose PICOS++ case:
+  picos_case = "PICOS_case_2";
+  species_index = "1"; // ss
+  time_index    = "50"; // tt
+
+  input_file_name_1 = root_input + picos_case + "/" + "x_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+  input_file_name_2 = root_input + picos_case + "/" + "v_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+  input_file_name_3 = root_input + picos_case + "/" + "a_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+
   x_p.load(input_file_name_1,csv_ascii);
   v_p.load(input_file_name_2,csv_ascii);
   a_p.load(input_file_name_3,csv_ascii);
@@ -354,6 +369,11 @@ int main()
   x_p.save(root_output + "/"  + "x_p_new2.csv",csv_ascii);
   v_p.save(root_output + "/"  + "v_p_new2.csv",csv_ascii);
   a_p.save(root_output + "/"  + "a_p_new2.csv",csv_ascii);
+
+  // STEP 11:
+  // =====================================================================================
+  // Check for memory leaks when using delete:
+  // =====================================================================================
 
   return 0;
 }

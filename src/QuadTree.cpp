@@ -1,38 +1,35 @@
 #include "QuadTree.h"
 #include <iostream>
 
-using namespace std;
-using namespace arma;
-
 // =======================================================================================
-quadTree_TYP::quadTree_TYP()
+qt_TYP::qt_TYP()
 {
   // All pointers must be made NULL:
-  this->quadTree_params = NULL;
+  this->qt_params = NULL;
   root = NULL;
 }
 
 // =======================================================================================
-quadTree_TYP::quadTree_TYP(quadTree_params_TYP * quadTree_params, vector<uint> ip, arma::mat * v)
+qt_TYP::qt_TYP(qt_params_TYP * qt_params, vector<uint> ip, mat * v)
 {
   // Store pointer to tree parameters
-  this->quadTree_params = quadTree_params;
+  this->qt_params = qt_params;
 
   // Create root node:
   uint depth_root = 0;
-  arma::vec min = quadTree_params->min;
-  arma::vec max = quadTree_params->max;
-  root = new quadNode_TYP(min,max,depth_root,quadTree_params,ip,v);
+  vec min = qt_params->min;
+  vec max = qt_params->max;
+  root = new q_node_TYP(min,max,depth_root,qt_params,ip,v);
 }
 
 // =======================================================================================
-void quadTree_TYP::populate_tree()
+void qt_TYP::populate_tree()
 {
-  this->root->populate_node();
+  this->root->populate_subnodes();
 }
 
 // =======================================================================================
-void quadTree_TYP::clear_tree()
+void qt_TYP::clear_tree()
 {
   if (NULL == root)
   {
@@ -44,13 +41,13 @@ void quadTree_TYP::clear_tree()
 }
 
 // =======================================================================================
-void quadTree_TYP::delete_tree()
+void qt_TYP::delete_tree()
 {
   this->root->delete_nodes();
 }
 
 // =======================================================================================
-int quadTree_TYP::count_leaf_points()
+int qt_TYP::count_leaf_points()
 {
   int k = 0;
   if (this->root != NULL)
@@ -60,15 +57,15 @@ int quadTree_TYP::count_leaf_points()
 }
 
 // =======================================================================================
-vector<quadNode_TYP *> quadTree_TYP::get_leaf_nodes()
+vector<q_node_TYP *> qt_TYP::get_leaf_nodes()
 {
-  vector<quadNode_TYP *> leafs;
+  vector<q_node_TYP *> leafs;
   root->get_leaf_nodes(&leafs);
   return leafs;
 }
 
 // =======================================================================================
-void quadNode_TYP::get_leaf_nodes(vector<quadNode_TYP *> * leafs)
+void q_node_TYP::get_leaf_nodes(vector<q_node_TYP *> * leafs)
 {
   // Check if present node is a leaf:
   int method = 2;
@@ -89,7 +86,7 @@ void quadNode_TYP::get_leaf_nodes(vector<quadNode_TYP *> * leafs)
 }
 
 // =======================================================================================
-void quadNode_TYP::delete_nodes()
+void q_node_TYP::delete_nodes()
 {
   for (int nn = 0; nn < 4; nn++)
   {
@@ -109,13 +106,13 @@ void quadNode_TYP::delete_nodes()
 
 // =======================================================================================
 // Overloaded constructor:
-quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_params_TYP * quadTree_params,std::vector<uint> ip, arma::mat * v)
+q_node_TYP::q_node_TYP(vec min, vec max, uint depth, qt_params_TYP * qt_params,vector<uint> ip, mat * v)
 {
   // Node "natural" attributes:
   this->min     = min;
   this->max     = max;
   this->depth   = depth;
-  this->quadTree_params = quadTree_params;
+  this->qt_params = qt_params;
 
   // Node "data" attributes:
   this->ip = ip;
@@ -125,7 +122,7 @@ quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_pa
   this->center  = (min + max)/2;
 
   // Derived "data" attributes:
-  this->p_count = ip.size();
+  this->ip_count = ip.size();
   this->is_leaf = false;
 
   // Allocate memory for subnodes:
@@ -138,11 +135,11 @@ quadNode_TYP::quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_pa
 }
 
 // =======================================================================================
-int quadNode_TYP::apply_conditionals_ip_subnode()
+int q_node_TYP::apply_conditionals_ip_subnode()
 {
   // Conditionals:
-  bool condition_1 = depth >= quadTree_params->min_depth;
-  bool condition_2 = depth < quadTree_params->max_depth;
+  bool condition_1 = depth >= qt_params->min_depth;
+  bool condition_2 = depth < qt_params->max_depth;
 
   // Reject new subnodes by default:
   int accept_new_subnodes = 0;
@@ -157,7 +154,7 @@ int quadNode_TYP::apply_conditionals_ip_subnode()
     // If so, accept new subnodes
     for (int n = 0; n < 4; n++)
     {
-      if (ip_subnode[n].size() > quadTree_params->min_count)
+      if (ip_subnode[n].size() > qt_params->min_count)
       {
         accept_new_subnodes = 1;
         break;
@@ -172,21 +169,45 @@ int quadNode_TYP::apply_conditionals_ip_subnode()
   return accept_new_subnodes;
 }
 
+// =======================================================================================
+void q_node_TYP::create_subnode(int n, vector<uint> ip)
+{
+  // Bounds of new subnode:
+  vec min_local(2);
+  vec max_local(2);
+  get_subnode_bounds(n,&min_local,&max_local);
+
+  // Create subnode:
+  uint depth = this->depth + 1;
+  subnode[n] = new q_node_TYP(min_local,max_local,depth,qt_params,ip,v);
+}
 
 // =======================================================================================
-void quadNode_TYP::populate_node()
+void q_node_TYP:: update_subnode(int n,vector<uint> ip)
 {
-  // Organize point data into ip_subnode to determine if new subnodes need to be created:
+  // Update node "data" attributes of the subnode which alread exists:
+  subnode[n]->ip = ip;
+  subnode[n]->ip_count = ip.size();
+  subnode[n]->is_leaf = false;
+}
+
+// =======================================================================================
+void q_node_TYP::populate_subnodes()
+{
+  // When each q_node is created (constructor) it is automatically populated with an ip
+  // vector. This corresponds to the data associated with this node.
+  // If we want to proceed (drill deeper), we need to populate the subnodes.
+
+  // Organize ip data into ip_subnode to determine if new subnodes need to be created:
   // -------------------------------------------------------------------------------------
-  // Propose new subnodes
-  calculate_ip_subnode();
+  organze_ip_into_proposed_subnodes();
 
   // Run tests to determine if new subnodes are to be accepted:
   // -------------------------------------------------------------------------------------
   // Do we accept new proposed subnodes?
   int accept_new_subnodes = apply_conditionals_ip_subnode();
 
-  // If accepted, create populate subnodes or create them if they dont exist
+  // If accepted, populate subnodes or create them if they dont exist
   // If not accepted, declare parent node a leaf node
   // -------------------------------------------------------------------------------------
   if (accept_new_subnodes == 1)
@@ -208,35 +229,27 @@ void quadNode_TYP::populate_node()
         // Create new subnode if it doesnt exist:
         if (subnode[n] == NULL)
         {
-          // Could consider creating a method called create_subnode(n,ip)
-
-          // Bounds of new subnode:
-          vec min_local(2);
-          vec max_local(2);
-          get_subnode_bounds(n,&min_local,&max_local);
-
-          // Create subnode:
-          uint depth = this->depth + 1;
-          subnode[n] = new quadNode_TYP(min_local,max_local,depth,quadTree_params,ip_local,v);
+          create_subnode(n,ip_local);
         }
         else // subnode[n] already exists:
         {
-          // consider a method called update_subnode(n,ip)
+          // consider a method called
+          update_subnode(n,ip_local);
 
-          // Update node "data" attributes of the subnode:
-          subnode[n]->ip = ip_local;
-          subnode[n]->p_count = ip_local.size();
-          subnode[n]->is_leaf = false;
+          // // Update node "data" attributes of the subnode:
+          // subnode[n]->ip = ip_local;
+          // subnode[n]->ip_count = ip_local.size();
+          // subnode[n]->is_leaf = false;
         }
 
         // Move in deeper:
-        subnode[n]->populate_node();
+        subnode[n]->populate_subnodes();
       }
     } // end, for loop
 
     // Clear ip on parent node since they have now being distributed amongsnt new subnodes:
     this->ip.clear();
-    this->p_count = 0;
+    this->ip_count = 0;
 
     // Label parent node as NOT a leaf node:
     this->is_leaf = false;
@@ -259,7 +272,7 @@ void quadNode_TYP::populate_node()
 }
 
 // =======================================================================================
-void quadNode_TYP::get_subnode_bounds(int node_index, arma::vec * min_local, arma::vec * max_local)
+void q_node_TYP::get_subnode_bounds(int node_index, vec * min_local, vec * max_local)
 {
   switch (node_index)
   {
@@ -307,9 +320,9 @@ void quadNode_TYP::get_subnode_bounds(int node_index, arma::vec * min_local, arm
 }
 
 // =======================================================================================
-void quadNode_TYP::calculate_ip_subnode()
+void q_node_TYP::organze_ip_into_proposed_subnodes()
 {
-  for (int ii = 0; ii < this->p_count; ii++)
+  for (int ii = 0; ii < this->ip_count; ii++)
   {
     // Get global index:
     uint jj = this->ip[ii];
@@ -317,7 +330,7 @@ void quadNode_TYP::calculate_ip_subnode()
     // Current data point:
     double y = (*v)(jj,0);
     double z = (*v)(jj,1);
-    arma::vec r = {y,z};
+    vec r = {y,z};
 
     // Check if data is within node's boundaries:
     // ========================================
@@ -338,12 +351,12 @@ void quadNode_TYP::calculate_ip_subnode()
 }
 
 // =======================================================================================
-bool quadNode_TYP::is_node_leaf(int method)
+bool q_node_TYP::is_node_leaf(int method)
 {
   // This method determines if current node is a leaf node.
   // There are at least two ways to identify leaf_nodes.
   // 1- if ALL subnodes == NULL.
-  // 2- if is_leaf == true where the flag is set during the formation of the quad tree in "populate_node()".
+  // 2- if is_leaf == true where the flag is set during the formation of the quad tree in "populate_subnodes()".
   // The second method is favoured because the quad tree heap memory infrastructure can be reutilized many times; whereas the NULL method relies on realeasing the quad-tree memory every time it is to be refreshed because the data *v has changed.
 
   bool leaf_flag = true;
@@ -372,7 +385,7 @@ bool quadNode_TYP::is_node_leaf(int method)
     default:
     {
       // Error: Invalid method
-      std::cerr << "Invalid method. Choose either method 1 or method 2." << std::endl;
+      cerr << "Invalid method. Choose either method 1 or method 2." << endl;
       break;
     }
   }
@@ -381,19 +394,19 @@ bool quadNode_TYP::is_node_leaf(int method)
 }
 
 // =======================================================================================
-int quadNode_TYP::count_leaf_points(int k)
+int q_node_TYP::count_leaf_points(int k)
 {
   // This method counts all the points present in a quad tree
   // First, it deterines if present node is a leaf.
-  // If so, it accumulates p_count
+  // If so, it accumulates ip_count
   // If not so, it proceeds to traverse tree using recursion
   // Every time a new node is accessed, leaf status is checked.
 
-  // If current is node is a leaf node, accumulate p_count and return to calling stack:
+  // If current is node is a leaf node, accumulate ip_count and return to calling stack:
   int method = 2;
   if (is_node_leaf(method) == true)
   {
-    return k + this->p_count;
+    return k + this->ip_count;
   }
 
   // Traverse the tree:
@@ -411,7 +424,7 @@ int quadNode_TYP::count_leaf_points(int k)
 }
 
 // =======================================================================================
-bool quadNode_TYP::IsPointInsideBoundary(arma::vec r)
+bool q_node_TYP::IsPointInsideBoundary(vec r)
 {
     // Objective:
     // if r is inside the boundaries of the node, return true, otherwise false
@@ -434,7 +447,7 @@ bool quadNode_TYP::IsPointInsideBoundary(arma::vec r)
 }
 
 // =======================================================================================
-int quadNode_TYP::WhichSubNodeDoesItBelongTo(arma::vec r)
+int q_node_TYP::WhichSubNodeDoesItBelongTo(vec r)
 {
     //   |-----------------+------------------+
     //   |  node_left = 1  |  node_right = 0  |
@@ -443,10 +456,10 @@ int quadNode_TYP::WhichSubNodeDoesItBelongTo(arma::vec r)
     //   +-----------------+------------------+
 
     // Origin of parent node:
-    arma::vec r0 = center;
+    vec r0 = center;
 
     //  Vector pointing in the direction of point r relative to center of node:
-    arma::vec d = r - r0;
+    vec d = r - r0;
 
     // Number associated with subnode:
     int node_index;
@@ -479,7 +492,7 @@ int quadNode_TYP::WhichSubNodeDoesItBelongTo(arma::vec r)
 }
 
 // =======================================================================================
-bool quadNode_TYP::DoesSubNodeExist(int node_index)
+bool q_node_TYP::DoesSubNodeExist(int node_index)
 {
     if (NULL == subnode[node_index])
     {
@@ -494,11 +507,11 @@ bool quadNode_TYP::DoesSubNodeExist(int node_index)
 }
 
 // =======================================================================================
-void quadNode_TYP::clear_node()
+void q_node_TYP::clear_node()
 {
   // This method just removes the particle count and indices stored in this node. It does not remove the depth, min, max, center information as these are the node parameters and will not change if we use another dataset in this->v;
 
-  this->p_count = 0;
+  this->ip_count = 0;
   this->ip.clear();
   this->is_leaf = false;
 

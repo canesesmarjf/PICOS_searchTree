@@ -5,10 +5,11 @@
 #include <armadillo>
 #include <cassert>
 using namespace std;
+using namespace arma;
 
 // This header file contains three main classes:
-// - tree_params_TYP
-// - binaryTree_TYP
+// - bt_params_TYP
+// - bt_TYP
 // - node_TYP
 
 // Is important to node that a tree is composed of nodes; thus a tree as a whole will have parameters such as:
@@ -21,14 +22,14 @@ using namespace std;
 // - Data stored in node
 
 // =====================================================================================
-class tree_params_TYP
+class bt_params_TYP
 {
 public:
   uint dimensionality;
-  arma::vec min;
-  arma::vec max;
-  arma::uvec max_depth;
-  arma::uvec dim_levels; // Determines when the tree needs to change to the next dimension
+  vec min;
+  vec max;
+  uvec max_depth;
+  uvec dim_levels; // Determines when the tree needs to change to the next dimension
   uint num_nodes; // Number of nodes based on 2^depth_max
 
   // Derived variables:
@@ -37,7 +38,7 @@ public:
   // int num_elem; // Total number of elements to hold in tree
 
   // int elem_per_node; // number of elements per node based on a uniform distribution
-  // arma::vec node_centers; // Vector containing the center locations of the nodes
+  // vec node_centers; // Vector containing the center locations of the nodes
 };
 
 // =====================================================================================
@@ -45,23 +46,23 @@ class node_TYP
 {
 public:
   // Data variables:
-  int p_count;            // Number of points indexed in the current node
-  std::vector<uint> ip;   // Indices of data appended to this node
+  int ip_count;            // Number of points indexed in the current node
+  vector<uint> ip;   // Indices of data appended to this node
 
   // Node parameters:
   uint depth;
-  arma::vec min;
-  arma::vec max;
-  arma::vec center;
+  vec min;
+  vec max;
+  vec center;
 
   // Constructor:
   node_TYP(){};
-  node_TYP(arma::vec min, arma::vec max, uint depth, tree_params_TYP * tree_params);
+  node_TYP(vec min, vec max, uint depth, bt_params_TYP * bt_params);
 
   // Methods:
-  void insert(uint i, vector<arma::vec *> data, bool write_data); // Insert the ith element of data
-  void insert_all(vector<arma::vec *> data); // Insert all elements of the data
-  node_TYP * find(uint i, vector<arma::vec *> data, int search_dimensionality);
+  void insert(uint i, vector<vec *> data, bool write_data); // Insert the ith element of data
+  void insert_all(vector<vec *> data); // Insert all elements of the data
+  node_TYP * find(uint i, vector<vec *> data, int search_dimensionality);
   void clear_node();
   node_TYP * find(double xq); // Find and return pointer of node corresponding to position xq
   node_TYP * find(double xq, int dim); // Find and return pointer of node corresponding to position xq searched along dimension "dim"
@@ -71,8 +72,8 @@ public:
 
 private:
   // Variables:
-  tree_params_TYP * tree_params; // Pointer to tree parameters
-  std::vector<node_TYP *> subnode;
+  bt_params_TYP * bt_params; // Pointer to tree parameters
+  vector<node_TYP *> subnode;
 
   // Subnodes within this node:
   // subnode[0] : right_node
@@ -90,20 +91,20 @@ private:
 };
 
 // =====================================================================================
-class binaryTree_TYP
+class bt_TYP
 {
 public:
   // Constructor:
-  binaryTree_TYP();
-  binaryTree_TYP(tree_params_TYP * tree_params);
+  bt_TYP();
+  bt_TYP(bt_params_TYP * bt_params);
 
   // Variables:
   node_TYP * root; // Root node of tree
-  tree_params_TYP * tree_params;  // Pointer to tree attributes
+  bt_params_TYP * bt_params;  // Pointer to tree attributes
 
   // Methods:
-  void insert_all(vector<arma::vec *> data);
-  node_TYP * find(int i,vector<arma::vec *> data,int search_dimensionality);
+  void insert_all(vector<vec *> data);
+  node_TYP * find(int i,vector<vec *> data,int search_dimensionality);
   node_TYP * find(double xq);
   void clear_all();
   int count_leaf_nodes();

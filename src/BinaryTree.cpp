@@ -1,42 +1,40 @@
 #include "BinaryTree.h"
 #include <iostream>
 
-using namespace std;
-
 // =======================================================================================
-binaryTree_TYP::binaryTree_TYP()
+bt_TYP::bt_TYP()
 {
   // All pointers must be made NULL:
-  this->tree_params = NULL;
+  this->bt_params = NULL;
   root = NULL;
 }
 
 // =======================================================================================
-binaryTree_TYP::binaryTree_TYP(tree_params_TYP * tree_params)
+bt_TYP::bt_TYP(bt_params_TYP * bt_params)
 {
-  // Update tree_params:
-  tree_params->num_nodes = pow(2,sum(tree_params->max_depth));
-  tree_params->dim_levels = cumsum(tree_params->max_depth);
+  // Update bt_params:
+  bt_params->num_nodes = pow(2,sum(bt_params->max_depth));
+  bt_params->dim_levels = cumsum(bt_params->max_depth);
 
   // Store pointer to tree parameters
-  this->tree_params = tree_params;
+  this->bt_params = bt_params;
 
   // Create root node:
   uint depth_root = 0;
-  arma::vec min = tree_params->min;
-  arma::vec max = tree_params->max;
-  root = new node_TYP(min,max,depth_root,tree_params);
+  vec min = bt_params->min;
+  vec max = bt_params->max;
+  root = new node_TYP(min,max,depth_root,bt_params);
 }
 
 // =======================================================================================
-void binaryTree_TYP::insert_all(vector<arma::vec *> data)
+void bt_TYP::insert_all(vector<vec *> data)
 {
   // Insert points into nodes:
   this->root->insert_all(data);
 }
 
 // =======================================================================================
-void binaryTree_TYP::clear_all()
+void bt_TYP::clear_all()
 {
   if (NULL == root)
   {
@@ -48,21 +46,21 @@ void binaryTree_TYP::clear_all()
 }
 
 // =======================================================================================
-int binaryTree_TYP::count_leaf_nodes()
+int bt_TYP::count_leaf_nodes()
 {
   int k = 0;
   return this->root->count_leaf_nodes(k);
 }
 
 // =======================================================================================
-int binaryTree_TYP::count_leaf_points()
+int bt_TYP::count_leaf_points()
 {
   int k = 0;
   return this->root->count_leaf_points(k);
 }
 
 // =======================================================================================
-void binaryTree_TYP::delete_nodes()
+void bt_TYP::delete_nodes()
 {
   this->root->delete_nodes();
 }
@@ -110,7 +108,7 @@ int node_TYP::count_leaf_points(int k)
   // If both subnodes are NULL, the this must be a leaf_node:
   if (this->subnode[0] == NULL && this->subnode[1] == NULL)
   {
-    return k + this->p_count;
+    return k + this->ip_count;
   }
   else
   {
@@ -137,34 +135,34 @@ void node_TYP::delete_nodes()
 }
 
 // =======================================================================================
-node_TYP::node_TYP(arma::vec min, arma::vec max, uint depth, tree_params_TYP * tree_params)
+node_TYP::node_TYP(vec min, vec max, uint depth, bt_params_TYP * bt_params)
 {
   // Node attributes:
   this->center  = (min + max)/2;
   this->min     = min;
   this->max     = max;
   this->depth       = depth;
-  this->tree_params = tree_params;
+  this->bt_params = bt_params;
 
   // Allocate memory for subnodes:
   this->subnode.reserve(2);
   this->subnode[0] = NULL;
   this->subnode[1] = NULL;
-  this->p_count    = 0;
+  this->ip_count    = 0;
 }
 
 // insert method:
 // =======================================================================================
-void node_TYP::insert(uint i, vector<arma::vec *> data, bool write_data)
+void node_TYP::insert(uint i, vector<vec *> data, bool write_data)
 {
     // Objective:
     // insert point into a subnode of current node. When maximum depth is reached, append point to node.
 
     // Determine dimension to operate on:
-    int dim = sum(depth > tree_params->dim_levels);
+    int dim = sum(depth > bt_params->dim_levels);
 
     // Current data point:
-    double p = arma::as_scalar(data[dim]->at(i)); // make it a function that takes in i, data,dim
+    double p = as_scalar(data[dim]->at(i)); // make it a function that takes in i, data,dim
 
     // Check if data is within node's boundaries:
     // ===============================================
@@ -184,12 +182,12 @@ void node_TYP::insert(uint i, vector<arma::vec *> data, bool write_data)
         if (write_data)
         {
           this->ip.push_back(i);
-          this->p_count++;
+          this->ip_count++;
         }
 
         // Return control to calling stack IF max_depth for all dimensions has been reached:
-        uint total_dims = tree_params->dimensionality;
-        if (depth >= tree_params->dim_levels(total_dims-1))
+        uint total_dims = bt_params->dimensionality;
+        if (depth >= bt_params->dim_levels(total_dims-1))
         {
           return;
         }
@@ -197,7 +195,7 @@ void node_TYP::insert(uint i, vector<arma::vec *> data, bool write_data)
         {
           // Evaluate data at next dimension:
           dim++;
-          p = arma::as_scalar(data[dim]->at(i));
+          p = as_scalar(data[dim]->at(i));
         }
     }
 
@@ -220,7 +218,7 @@ void node_TYP::insert(uint i, vector<arma::vec *> data, bool write_data)
 
 // insert_all method:
 // ================================================================================================================
-void node_TYP::insert_all(vector<arma::vec *> data)
+void node_TYP::insert_all(vector<vec *> data)
 {
   for (int i = 0; i < data[0]->size(); i++)
   {
@@ -254,7 +252,7 @@ bool node_TYP::HasNodeReachMaxDepth(int dim)
 {
     int depth = this->depth;
 
-    if (depth >= tree_params->dim_levels[dim]) // Greater only? equal only?
+    if (depth >= bt_params->dim_levels[dim]) // Greater only? equal only?
     {
         return 1;
     }
@@ -291,14 +289,14 @@ int node_TYP::WhichSubNodeDoesItBelongTo(double p, int dim)
 
 // find method:
 // =================================================================================================================
-node_TYP * binaryTree_TYP::find(int i,vector<arma::vec *> data,int search_dimensionality)
+node_TYP * bt_TYP::find(int i,vector<vec *> data,int search_dimensionality)
 {
   return this->root->find(i,data,search_dimensionality);
 }
 
 // find method:
 // =================================================================================================================
-node_TYP * binaryTree_TYP::find(double xq)
+node_TYP * bt_TYP::find(double xq)
 {
   return this->root->find(xq);
 }
@@ -343,7 +341,7 @@ node_TYP * node_TYP::find(double xq)
     int search_dimensionality = 1;
 
     // Calculate the relevant dimension based on the depth of the present node:
-    int dim = sum(depth > tree_params->dim_levels);
+    int dim = sum(depth > bt_params->dim_levels);
 
     // Check if data is within node's boundaries:
     if (!IsPointInsideBoundary(xq,dim))
@@ -375,18 +373,18 @@ node_TYP * node_TYP::find(double xq)
 
 // find method:
 // =================================================================================================================
-node_TYP * node_TYP::find(uint i, vector<arma::vec *> data, int search_dimensionality)
+node_TYP * node_TYP::find(uint i, vector<vec *> data, int search_dimensionality)
 {
     // Check the value of search _dimensionality:
-    assert(search_dimensionality <= tree_params->dimensionality && "search_dimensionality needs to be less or equal to dimensionality of tree");
+    assert(search_dimensionality <= bt_params->dimensionality && "search_dimensionality needs to be less or equal to dimensionality of tree");
 
     assert(search_dimensionality > 0 && "search_dimensionality needs to be greater than zero");
 
     // Calculate the relevant dimension based on the depth of the present node:
-    int dim = sum(depth > tree_params->dim_levels);
+    int dim = sum(depth > bt_params->dim_levels);
 
     // Extract the data based on the dimension being considered:
-    double xq = arma::as_scalar(data[dim]->at(i));
+    double xq = as_scalar(data[dim]->at(i));
 
     // Check if data is within node's boundaries:
     if (!IsPointInsideBoundary(xq,dim))
@@ -400,7 +398,7 @@ node_TYP * node_TYP::find(uint i, vector<arma::vec *> data, int search_dimension
     if (HasNodeReachMaxDepth(dim))
     {
       // Return control to calling stack IF maximum search dimension has been reached:
-      if (depth >= tree_params->dim_levels(search_dimensionality-1))
+      if (depth >= bt_params->dim_levels(search_dimensionality-1))
       {
         return this;
       }
@@ -408,7 +406,7 @@ node_TYP * node_TYP::find(uint i, vector<arma::vec *> data, int search_dimension
       {
         // Evaluate data at next dimension:
         dim++;
-        xq = arma::as_scalar(data[dim]->at(i));
+        xq = as_scalar(data[dim]->at(i));
       }
     }
 
@@ -445,8 +443,8 @@ void node_TYP::CreateSubNode(int node_index, int dim)
 {
     // Attributes for new subnode:
     uint depth = this->depth + 1;
-    arma::vec min = this->min; //x_left;
-    arma::vec max = this->max; //x_right;
+    vec min = this->min; //x_left;
+    vec max = this->max; //x_right;
     ip.reserve(500);
 
     switch (node_index)
@@ -472,13 +470,13 @@ void node_TYP::CreateSubNode(int node_index, int dim)
     }
 
     // Create new subnode:
-    this->subnode[node_index] = new node_TYP(min, max, depth, tree_params);
+    this->subnode[node_index] = new node_TYP(min, max, depth, bt_params);
 }
 
 // ================================================================================================================
 void node_TYP::clear_node()
 {
-  this->p_count = 0;
+  this->ip_count = 0;
   this->ip.clear();
 
   if (NULL != this->subnode[0])

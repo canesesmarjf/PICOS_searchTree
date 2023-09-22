@@ -59,9 +59,9 @@ int main()
   // We will use a binary tree to index the x_p data and produce a leaf_x vector
   // For each element in leaf_x vector which has a surplus, we will use a quadtree to index the v_p data and produce a leaf_v 2D vector
 
-  arma::vec x_p;
-  arma::mat v_p;
-  arma::vec a_p;
+  vec x_p;
+  mat v_p;
+  vec a_p;
 
   string input_file_name_1 = root_input + picos_case + "/" + "x_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
   string input_file_name_2 = root_input + picos_case + "/" + "v_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
@@ -87,7 +87,7 @@ int main()
 
   // 1D binary tree parameters:
   // -------------------------------------------------------------------------------------
-  tree_params_TYP bt_params;
+  bt_params_TYP bt_params;
 
   bt_params.dimensionality = 1;
   bt_params.min       = {-1};
@@ -96,7 +96,7 @@ int main()
 
   // 2D Quadtree parameters:
   // -------------------------------------------------------------------------------------
-  quadTree_params_TYP qt_params;
+  qt_params_TYP qt_params;
 
   qt_params.min = {-1,-1};
   qt_params.max = {+1,+1};
@@ -130,15 +130,15 @@ int main()
 
   // Binary tree diagnostics:
   // -------------------------------------------------------------------------------------
-  int k = particle_tree.binary_tree.count_leaf_nodes();
+  int k = particle_tree.bt.count_leaf_nodes();
   cout << "total number of leaf nodes populated: " << k << endl;
-  k = particle_tree.binary_tree.count_leaf_points();
+  k = particle_tree.bt.count_leaf_points();
   cout << "total number of leaf points inserted: " << k << endl;
 
-  // Save leaf_x p_count profile:
+  // Save leaf_x ip_count profile:
   // -------------------------------------------------------------------------------------
-  particle_tree.xq.save(root_output + "/"  + "x_q" + ".csv", arma::csv_ascii);
-  particle_tree.p_count.save(root_output + "/"  + "leaf_x_p_count" + ".csv", arma::csv_ascii);
+  particle_tree.xq.save(root_output + "/"  + "x_q" + ".csv", csv_ascii);
+  particle_tree.ip_count.save(root_output + "/"  + "leaf_x_ip_count" + ".csv", csv_ascii);
 
   // Quad tree diagnostics:
   // -------------------------------------------------------------------------------------
@@ -147,9 +147,9 @@ int main()
     vec bt_count = zeros<vec>(Nx);
     for (int xx = 0; xx < Nx; xx++)
     {
-      qt_count[xx] = particle_tree.quad_tree[xx].count_leaf_points();
+      qt_count[xx] = particle_tree.qt[xx].count_leaf_points();
       if (particle_tree.leaf_v[xx][0] != NULL)
-        bt_count[xx] = particle_tree.p_count[xx];
+        bt_count[xx] = particle_tree.ip_count[xx];
     }
 
     cout << "Total number of particles indexed in quad tree (binary tree) " << sum(bt_count) << endl;
@@ -162,10 +162,10 @@ int main()
   // Assess conservation:PRIOR TO RESAMPLING
   // =====================================================================================
   {
-    arma::vec m_t(Nx);
-    arma::vec p_x(Nx);
-    arma::vec p_r(Nx);
-    arma::vec KE(Nx);
+    vec m_t(Nx);
+    vec p_x(Nx);
+    vec p_r(Nx);
+    vec KE(Nx);
 
     for (int xx = 0; xx < Nx ; xx++)
     {
@@ -201,7 +201,7 @@ int main()
   v_p*= y_norm;
 
   // Save resampled distribution for post-processing
-  arma::file_type format = arma::csv_ascii;
+  file_type format = csv_ascii;
   x_p.save(root_output + "/"  + "x_p_new.csv",csv_ascii);
   v_p.save(root_output + "/"  + "v_p_new.csv",csv_ascii);
   a_p.save(root_output + "/"  + "a_p_new.csv",csv_ascii);
@@ -222,29 +222,29 @@ int main()
     if (particle_tree.leaf_v[xx][0] != NULL)
     {
       // Create variables to contain data:
-      ivec node_p_count(particle_tree.leaf_v[xx].size());
+      ivec node_ip_count(particle_tree.leaf_v[xx].size());
       mat  node_center(particle_tree.leaf_v[xx].size(),2);
       mat  node_dim(particle_tree.leaf_v[xx].size(),2);
 
       // Assemble data:
       for (int vv = 0; vv < particle_tree.leaf_v[xx].size(); vv++)
       {
-        // cout << "p_count = " << leaf_v[xx][vv]->p_count << endl;
-        node_p_count(vv)  = particle_tree.leaf_v[xx][vv]->p_count;
+        // cout << "ip_count = " << leaf_v[xx][vv]->ip_count << endl;
+        node_ip_count(vv)  = particle_tree.leaf_v[xx][vv]->ip_count;
         node_center.row(vv) = particle_tree.leaf_v[xx][vv]->center.t();
         node_dim.row(vv)    = particle_tree.leaf_v[xx][vv]->max.t() - particle_tree.leaf_v[xx][vv]->min.t();
       }
 
       // Save data:
       string file_name;
-      file_name = root_output + "/"  + "leaf_v_" + "p_count" + "_xx_" + to_string(xx) + ".csv";
-      node_p_count.save(file_name, arma::csv_ascii);
+      file_name = root_output + "/"  + "leaf_v_" + "ip_count" + "_xx_" + to_string(xx) + ".csv";
+      node_ip_count.save(file_name, csv_ascii);
 
       file_name = root_output + "/"  + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
-      node_center.save(file_name, arma::csv_ascii);
+      node_center.save(file_name, csv_ascii);
 
       file_name = root_output + "/"  + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
-      node_dim.save(file_name, arma::csv_ascii);
+      node_dim.save(file_name, csv_ascii);
     }
   }
 
@@ -255,10 +255,10 @@ int main()
   // Since we have resampled the data, in order to assess conservation, we need clear contents of trees and re-populate them
 
   // Clear contents of particle tree:
-  particle_tree.binary_tree.clear_all();
+  particle_tree.bt.clear_all();
   for (int xx = 0; xx < Nx; xx++)
   {
-    particle_tree.quad_tree[xx].clear_tree();
+    particle_tree.qt[xx].clear_tree();
   }
 
   if (false)
@@ -277,17 +277,17 @@ int main()
   particle_tree.populate_tree();
 
   // Save output:
-  particle_tree.p_count.save(root_output + "/"  + "leaf_x_p_count_new" + ".csv", arma::csv_ascii);
+  particle_tree.ip_count.save(root_output + "/"  + "leaf_x_ip_count_new" + ".csv", csv_ascii);
 
   // STEP 9:
   // =====================================================================================
   // Assess conservation: AFTER RESAMPLING
   // =====================================================================================
   {
-    arma::vec m_t(Nx);
-    arma::vec p_x(Nx);
-    arma::vec p_r(Nx);
-    arma::vec KE(Nx);
+    vec m_t(Nx);
+    vec p_x(Nx);
+    vec p_r(Nx);
+    vec KE(Nx);
     for (int xx = 0; xx < Nx ; xx++)
     {
       uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
@@ -323,10 +323,10 @@ int main()
   // - Rescale data and save results
 
   // Clear contents of tree:
-  particle_tree.binary_tree.clear_all();
+  particle_tree.bt.clear_all();
   for (int xx = 0; xx < Nx; xx++)
   {
-    particle_tree.quad_tree[xx].clear_tree();
+    particle_tree.qt[xx].clear_tree();
   }
 
   // Load a new data set:
@@ -365,7 +365,7 @@ int main()
   v_p*= y_norm;
 
   // Save resampled distribution for post-processing
-  format = arma::csv_ascii;
+  format = csv_ascii;
   x_p.save(root_output + "/"  + "x_p_new2.csv",csv_ascii);
   v_p.save(root_output + "/"  + "v_p_new2.csv",csv_ascii);
   a_p.save(root_output + "/"  + "a_p_new2.csv",csv_ascii);

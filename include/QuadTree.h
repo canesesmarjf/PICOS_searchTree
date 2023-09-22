@@ -4,13 +4,14 @@
 #include <vector>
 #include <armadillo>
 using namespace std;
+using namespace arma;
 
 // =====================================================================================
-class quadTree_params_TYP
+class qt_params_TYP
 {
 public:
-  arma::vec min; // Minimum lengths that bound domain covered by tree
-  arma::vec max; // Maximum lengths that bound domain covered by tree
+  vec min; // Minimum lengths that bound domain covered by tree
+  vec max; // Maximum lengths that bound domain covered by tree
   uint min_depth;
   uint max_depth; // Maximum depth to be reached of min_count is not reached first
   uint min_count; // Minimum number of particles in cell allowed.
@@ -20,38 +21,40 @@ public:
 };
 
 // =====================================================================================
-class quadNode_TYP
+class q_node_TYP
 {
 public:
   // Node "data" attributes:
-  int p_count;            // Number of points indexed in the current node
-  std::vector<uint> ip;   // Indices of data appended to this node
-  arma::mat *v;           // Pointer to data to be indexed
+  int ip_count;            // Number of points indexed in the current node
+  vector<uint> ip;   // Indices of data appended to this node
+  mat *v;           // Pointer to data to be indexed
 
   // Node "natural" attributes:
   uint depth;
-  arma::vec min;
-  arma::vec max;
-  arma::vec center;
+  vec min;
+  vec max;
+  vec center;
 
   // Constructor:
-  quadNode_TYP(){};
-  quadNode_TYP(arma::vec min, arma::vec max, uint depth, quadTree_params_TYP * quadTree_params, std::vector<uint> ip,arma::mat * v);
+  q_node_TYP(){};
+  q_node_TYP(vec min, vec max, uint depth, qt_params_TYP * qt_params, vector<uint> ip,mat * v);
 
   // Methods:
-  void populate_node();
-  void calculate_ip_subnode();
+  void populate_subnodes();
+  void organze_ip_into_proposed_subnodes();
   void clear_node();
   void delete_nodes();
   int count_leaf_points(int k);
-  void get_subnode_bounds(int node_index, arma::vec * min_l, arma::vec * max_l);
-  void get_leaf_nodes(vector<quadNode_TYP *> * leafs);
+  void get_subnode_bounds(int node_index, vec * min_l, vec * max_l);
+  void get_leaf_nodes(vector<q_node_TYP *> * leafs);
+  void create_subnode(int n, vector<uint> ip);
+  void update_subnode(int n,vector<uint> ip);
 
 private:
   // Variables:
-  quadTree_params_TYP * quadTree_params; // Pointer to tree parameters
-  std::vector<quadNode_TYP *> subnode;
-  std::vector<vector<uint>> ip_subnode;
+  qt_params_TYP * qt_params; // Pointer to tree parameters
+  vector<q_node_TYP *> subnode;
+  vector<vector<uint>> ip_subnode;
   bool is_leaf;
 
   // subnodes within this node:
@@ -62,8 +65,8 @@ private:
   //   +------------------+------------------+
 
   // Methods:
-  bool IsPointInsideBoundary(arma::vec r);
-  int WhichSubNodeDoesItBelongTo(arma::vec r);
+  bool IsPointInsideBoundary(vec r);
+  int WhichSubNodeDoesItBelongTo(vec r);
   bool DoesSubNodeExist(int subNode);
   void CreateSubNode(int subNode);
   bool is_node_leaf(int method);
@@ -72,22 +75,22 @@ private:
 };
 
 // =====================================================================================
-class quadTree_TYP
+class qt_TYP
 {
 public:
   // Constructor:
-  quadTree_TYP();
-  quadTree_TYP(quadTree_params_TYP * quadTree_params, vector<uint> ip, arma::mat * v);
+  qt_TYP();
+  qt_TYP(qt_params_TYP * qt_params, vector<uint> ip, mat * v);
 
   // Variables:
-  quadNode_TYP * root; // Root node of tree
-  quadTree_params_TYP * quadTree_params;  // Pointer to tree attributes
+  q_node_TYP * root; // Root node of tree
+  qt_params_TYP * qt_params;  // Pointer to tree attributes
 
   // Methods:
   void populate_tree();
   void clear_tree();
   void delete_tree();
-  vector<quadNode_TYP *> get_leaf_nodes();
+  vector<q_node_TYP *> get_leaf_nodes();
   int count_leaf_points();
 
   // QUESTION:

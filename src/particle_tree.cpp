@@ -3,11 +3,11 @@
 using namespace arma;
 
 // ======================================================================================
-particle_tree_TYP::particle_tree_TYP(tree_params_TYP * binary_tree_params, quadTree_params_TYP * quad_tree_params, arma::vec * x_p, arma::mat * v_p, arma::vec * a_p)
+particle_tree_TYP::particle_tree_TYP(bt_params_TYP * bt_params, qt_params_TYP * qt_params, vec * x_p, mat * v_p, vec * a_p)
 {
   // Store pointer to tree parameters:
-  this->binary_tree_params = binary_tree_params;
-  this->quad_tree_params = quad_tree_params;
+  this->bt_params = bt_params;
+  this->qt_params = qt_params;
 
   // Store pointers to data:
   this->x_p = x_p;
@@ -15,13 +15,13 @@ particle_tree_TYP::particle_tree_TYP(tree_params_TYP * binary_tree_params, quadT
   this->a_p = a_p;
 
   // Instance of binary tree for x dimension:
-  binary_tree = binaryTree_TYP(binary_tree_params);
+  bt = bt_TYP(bt_params);
 
   // Instance of quad tree vector, one for each node of binary tree:
-  int Nx = binary_tree_params->num_nodes;
-  quad_tree.resize(Nx);
+  int Nx = bt_params->num_nodes;
+  qt.resize(Nx);
   // for (int xx = 0; xx < Nx; xx++)
-  //   quad_tree[xx].root = NULL;
+  //   qt[xx].root = NULL;
 
   // Allocate memory and resize leaf_x and leaf_v:
   leaf_v.resize(Nx);
@@ -32,8 +32,8 @@ particle_tree_TYP::particle_tree_TYP(tree_params_TYP * binary_tree_params, quadT
   // Create x dimension query grid for binary_tree:
   this->create_x_query_grid();
 
-  // Allocate memory and resize p_count:
-  p_count = zeros<ivec>(Nx);
+  // Allocate memory and resize ip_count:
+  ip_count = zeros<ivec>(Nx);
 }
 
 // vector<particle_tree_TYP> IONS_tree;
@@ -43,60 +43,60 @@ particle_tree_TYP::particle_tree_TYP(tree_params_TYP * binary_tree_params, quadT
 void particle_tree_TYP::create_x_query_grid()
 {
   // Number of x grid nodes:
-  int Nx = pow(2,binary_tree_params->max_depth[0]);
+  int Nx = pow(2,bt_params->max_depth[0]);
 
   // Calculate total length and node length in x-space:
-  double Lx = binary_tree_params->max[0] - binary_tree_params->min[0];
+  double Lx = bt_params->max[0] - bt_params->min[0];
   double dx = Lx/Nx;
 
   // Create query grid:
-  this->xq = binary_tree_params->min[0] + dx/2 + regspace(0,Nx-1)*dx;
+  this->xq = bt_params->min[0] + dx/2 + regspace(0,Nx-1)*dx;
 }
 
 // ======================================================================================
 void particle_tree_TYP::calculate_leaf_x()
 {
-  // Assemble leaf_x and p_count:
-  int Nx = binary_tree_params->num_nodes;
+  // Assemble leaf_x and ip_count:
+  int Nx = bt_params->num_nodes;
   for (int xx = 0; xx < Nx ; xx++)
   {
-   leaf_x[xx] = binary_tree.find(xq(xx));
-   p_count[xx] = leaf_x[xx]->p_count;
+   leaf_x[xx] = bt.find(xq(xx));
+   ip_count[xx] = leaf_x[xx]->ip_count;
   }
 }
 
 // ======================================================================================
-void particle_tree_TYP::get_mean_p_count()
+void particle_tree_TYP::get_mean_ip_count()
 {
   // This operation requires the division between two integers; hence, care needs to be taken since this leads to loss of precision. Method used the the following:
   // 1- Cast numerator as a double so that division retains fractional part
   // 2- Round UP to the nearest LARGEST integer so as to over-estimate total number of particles. We later test for total particle usage to avoid "out of bounds" access.
 
-  int Nx = binary_tree_params->num_nodes;
-  int p_count_sum = sum(p_count);
-  mean_p_count = ceil((double)p_count_sum/Nx);
+  int Nx = bt_params->num_nodes;
+  int p_count_sum = sum(ip_count);
+  mean_ip_count = ceil((double)p_count_sum/Nx);
 }
 
 // ======================================================================================
-void particle_tree_TYP::assemble_quad_tree_vector()
+void particle_tree_TYP::assemble_qt_vector()
 {
-  int Nx = binary_tree_params->num_nodes;
+  int Nx = bt_params->num_nodes;
   for (int xx = 0; xx < Nx ; xx++)
   {
-    // Calculate surplus or deficit of p_count profile:
-    int delta_p_count = p_count[xx] - mean_p_count;
+    // Calculate surplus or deficit of ip_count profile:
+    int delta_ip_count = ip_count[xx] - mean_ip_count;
 
     // Populate quadtree[xx] only if leaf_x[xx] is surplus
-    if (delta_p_count > 0)
+    if (delta_ip_count > 0)
     {
       // Data for quadtree:
       vector<uint> ip = leaf_x[xx]->ip;
 
       // Populate quadtree:
-      quad_tree[xx] = quadTree_TYP(quad_tree_params,ip,this->v_p);
+      qt[xx] = qt_TYP(qt_params,ip,this->v_p);
 
       // Populate quadtree:
-      quad_tree[xx].populate_tree();
+      qt[xx].populate_tree();
     }
   }
 }
@@ -107,11 +107,11 @@ void particle_tree_TYP::calculate_leaf_v()
   for (int xx = 0; xx < leaf_x.size() ; xx++)
   {
     // Create quadtree[xx] only if leaf_x[xx] is surplus:
-    int delta_p_count = p_count[xx] - mean_p_count;
-    if (delta_p_count > 0)
+    int delta_ip_count = ip_count[xx] - mean_ip_count;
+    if (delta_ip_count > 0)
     {
       // Extract all leaf nodes:
-      leaf_v[xx] = quad_tree[xx].get_leaf_nodes();
+      leaf_v[xx] = qt[xx].get_leaf_nodes();
     }
     else
     {
@@ -124,19 +124,19 @@ void particle_tree_TYP::calculate_leaf_v()
 void particle_tree_TYP::populate_tree()
 {
   // Create a vector with pointers to the data:
-  vector<arma::vec *> x_data = {x_p};
+  vector<vec *> x_data = {x_p};
 
   // Insert 1D points into tree:
-  binary_tree.insert_all(x_data);
+  bt.insert_all(x_data);
 
   // Calculate leaf_x list:
   this->calculate_leaf_x();
 
   // Calculating the mean number of particles per node:
-  this->get_mean_p_count();
+  this->get_mean_ip_count();
 
   // Assemble quadtrees for each leaf_x element:
-  this->assemble_quad_tree_vector();
+  this->assemble_qt_vector();
 
   // Assembling leaf_v 2D vector:
   this->calculate_leaf_v();
@@ -148,7 +148,7 @@ void particle_tree_TYP::resample_distribution()
 {
 
   // Notes:
-  // Consider updating leaf_x[xx]->ip and p_count everytime you remove or add elements. this allows to reuse the binary tree data leaf_x for other operations.
+  // Consider updating leaf_x[xx]->ip and ip_count everytime you remove or add elements. this allows to reuse the binary tree data leaf_x for other operations.
 
   // Consider having the following two methods in this block:
   // - downsample_process(&ip_free);
@@ -157,7 +157,7 @@ void particle_tree_TYP::resample_distribution()
 
   // Down-sample surplus nodes:
   // -------------------------------------------------------------------------------------
-  std::vector<uint> ip_free;
+  vector<uint> ip_free;
   // this->down_sample(&ip_free);
 
   // Down sampling process:
@@ -178,7 +178,7 @@ void particle_tree_TYP::resample_distribution()
     for (int xx = 0; xx < leaf_x.size() ; xx++)
     {
       // Calculate particle surplus
-      particle_surplus = leaf_x[xx]->p_count - mean_p_count;
+      particle_surplus = leaf_x[xx]->ip_count - mean_ip_count;
 
       // Apply Vranic method if x-node is NOT NULL:
       if (leaf_v[xx][0] != NULL)
@@ -186,19 +186,19 @@ void particle_tree_TYP::resample_distribution()
         // Total number of v-nodes for this xx position:
         int Nv = leaf_v[xx].size();
 
-        // Assemble depth and p_count vectors:
+        // Assemble depth and ip_count vectors:
         vec depth(Nv);
-        vec p_count(Nv);
+        vec ip_count(Nv);
         vec node_metric(Nv);
         for(int vv = 0; vv < Nv; vv++){depth(vv) = leaf_v[xx][vv]->depth;}
-        for(int vv = 0; vv < Nv; vv++){p_count(vv) = leaf_v[xx][vv]->p_count;}
+        for(int vv = 0; vv < Nv; vv++){ip_count(vv) = leaf_v[xx][vv]->ip_count;}
 
-        // Calculate metric for every node based on depth*p_count (elementwise multiplication). The higher the depth AND number of particles, the higher the metric:
-        node_metric = depth%p_count;
+        // Calculate metric for every node based on depth*ip_count (elementwise multiplication). The higher the depth AND number of particles, the higher the metric:
+        node_metric = depth%ip_count;
 
         // Create sorted list starting from highest depth to lowest:
         // By giving priority to nodes with highest metric, we are operating on the regions that minimize the changes to the distribution function since they are more localized in velocity space:
-        uvec sorted_index_list = arma::sort_index(node_metric,"descend");
+        uvec sorted_index_list = sort_index(node_metric,"descend");
 
         // Loop over sorted leaf_v and apply vranic method:
         for (int vv = 0; vv < sorted_index_list.n_elem; vv++)
@@ -207,7 +207,7 @@ void particle_tree_TYP::resample_distribution()
           int tt = sorted_index_list(vv);
 
           // Total number of particles in leaf_v cube:
-          N = leaf_v[xx][tt]->p_count;
+          N = leaf_v[xx][tt]->ip_count;
 
           // Test if current node is suitable for resampling:
           if (N < N_min){continue;}
@@ -223,11 +223,11 @@ void particle_tree_TYP::resample_distribution()
           merge_cell_TYP set_M(M);
 
           // Define particle indices for set N:
-          arma::uvec ip = conv_to<uvec>::from(leaf_v[xx][tt]->ip);
-          arma::uvec ip_subset = ip.head(N);
+          uvec ip = conv_to<uvec>::from(leaf_v[xx][tt]->ip);
+          uvec ip_subset = ip.head(N);
 
           // Assign particle attributes for set N:
-          arma::mat v_p_subset = v_p->rows(ip_subset);
+          mat v_p_subset = v_p->rows(ip_subset);
           set_N.xi = x_p->elem(ip_subset);
           set_N.yi = v_p_subset.col(0);
           set_N.zi = v_p_subset.col(1);
@@ -309,21 +309,21 @@ void particle_tree_TYP::resample_distribution()
     int Nx = leaf_x.size();
     ivec node_counts(Nx);
     for (int xx = 0; xx < Nx; xx++)
-      node_counts(xx) = leaf_x[xx]->p_count;
+      node_counts(xx) = leaf_x[xx]->ip_count;
 
     // Vector to keep track how many times we need to replicate particles per node:
     ivec rep_num_vec(Nx);
     for (int xx = 0; xx < Nx; xx++)
-      rep_num_vec(xx) = ceil((double)mean_p_count/node_counts(xx));
+      rep_num_vec(xx) = ceil((double)mean_ip_count/node_counts(xx));
 
     // Layers:
     vec layer_fraction = {1/2, 1/4, 1/8, 1/16, 1/16};
     ivec layer(5);
-    layer(0) = (int)round((double)mean_p_count/2);
-    layer(1) = (int)round((double)mean_p_count/4);
-    layer(2) = (int)round((double)mean_p_count/8);
-    layer(3) = (int)round((double)mean_p_count/16);
-    layer(4) = mean_p_count - sum(layer.subvec(0,layer.n_elem - 2));
+    layer(0) = (int)round((double)mean_ip_count/2);
+    layer(1) = (int)round((double)mean_ip_count/4);
+    layer(2) = (int)round((double)mean_ip_count/8);
+    layer(3) = (int)round((double)mean_ip_count/16);
+    layer(4) = mean_ip_count - sum(layer.subvec(0,layer.n_elem - 2));
 
     for (int ll = 0; ll < layer.n_elem; ll++)
     {
@@ -341,7 +341,7 @@ void particle_tree_TYP::resample_distribution()
         if (particle_deficit < 0)
         {
           // Number of particles to replicate (original particles in node):
-          int num_0 = leaf_x[xx]->p_count;
+          int num_0 = leaf_x[xx]->ip_count;
 
           // Replication number: represents how many times a particle needs to be replicated
           // rep_num - 1 gives you the number of new particles per parent particle
@@ -358,11 +358,11 @@ void particle_tree_TYP::resample_distribution()
             if (ll == layer.n_elem)
             {
               leaf_x[xx]->ip.pop_back();
-              leaf_x[xx]->p_count--;
+              leaf_x[xx]->ip_count--;
             }
 
             // Diagnostics:
-            if (leaf_x[xx]->p_count < 0)
+            if (leaf_x[xx]->ip_count < 0)
               cout << "error:" << endl;
 
             // Parent particle attributes:

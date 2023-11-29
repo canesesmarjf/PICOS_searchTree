@@ -46,6 +46,11 @@ public:
   void assemble_qt_vector();
   void calculate_leaf_v();
   void resample_distribution();
+  void clear_all_contents();
+
+private:
+  void downsample_surplus_nodes(vector<uint> * ip_free);
+  void upsample_deficit_nodes(vector<uint> * ip_free);
 
 };
 

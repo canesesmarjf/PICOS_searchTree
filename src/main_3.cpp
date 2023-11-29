@@ -7,9 +7,6 @@
 // #include <ctime>
 #include <filesystem>
 #include <vector>
-
-// #include "BinaryTree.h"
-// #include "QuadTree.h"
 #include "particle_tree.h"
 
 using namespace std::chrono;
@@ -25,31 +22,47 @@ namespace fs = filesystem;
 
 */
 
+void create_dir(string dir_path)
+{
+  if (fs::is_directory(dir_path) == true)
+    fs::remove_all(dir_path);
+
+  if (fs::is_directory(dir_path) == false)
+    fs::create_directories(dir_path);
+}
+
+void load_input_data(string root_input, string picos_case, string species_index, string time_index, vec * x_p, mat * v_p, vec * a_p)
+{
+  vector<string> input_file_name;
+  input_file_name.resize(3);
+
+  input_file_name[0] = root_input + picos_case + "/" + "x_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+  input_file_name[1] = root_input + picos_case + "/" + "v_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+  input_file_name[2] = root_input + picos_case + "/" + "a_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
+
+  x_p->load(input_file_name[0],csv_ascii);
+  v_p->load(input_file_name[1],csv_ascii);
+  a_p->load(input_file_name[2],csv_ascii);
+}
+
 int main()
 {
-  // Choose PICOS++ case:
+  // Input from user:
   // =====================================================================================
-  string picos_case = "PICOS_case_2";
+  string picos_case    = "PICOS_case_2";
   string species_index = "2"; // ss
   string time_index    = "50"; // tt
-  string scenario      = "ss_" + species_index + "_tt_" + time_index;
+  string root_input  = "./Step_1_output/";
+  string root_output = "./Step_2_output/";
 
-  // Folder where output data is to be stored:
+  // Derived strings from user's input:
+  string scenario = "ss_" + species_index + "_tt_" + time_index;
+  string output_dir = root_output + picos_case + "/" + scenario;
+  // string input_dir  = root_output + picos_case + "/" + scenario;
+
+  // Create directory where output data is to be stored:
   // =====================================================================================
-  string root_output = "./Step_2_output/" + picos_case + "/" + scenario;
-  if (fs::is_directory(root_output) == true)
-  {
-    fs::remove_all(root_output);
-  }
-
-  if (fs::is_directory(root_output) == false)
-  {
-    fs::create_directories(root_output);
-  }
-
-  // Choose the input data:
-  // =====================================================================================
-  string root_input = "./Step_1_output/";
+  create_dir(output_dir);
 
   // STEP 1:
   // =====================================================================================
@@ -62,20 +75,32 @@ int main()
   vec x_p;
   mat v_p;
   vec a_p;
-
-  string input_file_name_1 = root_input + picos_case + "/" + "x_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
-  string input_file_name_2 = root_input + picos_case + "/" + "v_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
-  string input_file_name_3 = root_input + picos_case + "/" + "a_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
-
-  x_p.load(input_file_name_1,csv_ascii);
-  v_p.load(input_file_name_2,csv_ascii);
-  a_p.load(input_file_name_3,csv_ascii);
+  load_input_data(root_input,picos_case,species_index,time_index,&x_p, &v_p, &a_p);
 
   // Normalize data:
   // -------------------------------------------------------------------------------------
-  double y_norm = max(max(v_p));
-  if (species_index == "1"){y_norm = 2e6;}
-  double x_norm = ceil(max(x_p));
+  // Velocity:
+  double y_norm;
+  if (0)
+  {
+      y_norm = max(max(v_p))*1;
+      if (species_index == "1"){y_norm = 2e6;}
+  }
+  else
+  {
+    y_norm = 300e6;
+  }
+
+  // Position:
+  double x_norm = 0;
+  if (0)
+  {
+    x_norm = ceil(max(x_p))*2;
+  }
+  else
+  {
+    x_norm = 0.1;
+  }
 
   x_p = x_p/x_norm;
   v_p = v_p/y_norm;
@@ -87,19 +112,21 @@ int main()
 
   // 1D binary tree parameters:
   // -------------------------------------------------------------------------------------
+  // The min and max of the bt must exactly correspond to the min and max of the data to be  indexed. Also, it must not have empty cells since this cannot be dealt with at present:
+
   bt_params_TYP bt_params;
 
   bt_params.dimensionality = 1;
-  bt_params.min       = {-1};
-  bt_params.max       = {+1};
+  bt_params.min       = {min(x_p)};
+  bt_params.max       = {max(x_p)};
   bt_params.max_depth = {+6};
 
   // 2D Quadtree parameters:
   // -------------------------------------------------------------------------------------
   qt_params_TYP qt_params;
 
-  qt_params.min = {-1,-1};
-  qt_params.max = {+1,+1};
+  qt_params.min = {-max(max(v_p)),-max(max(v_p))};
+  qt_params.max = {+max(max(v_p)),+max(max(v_p))};
   if (species_index == "1")
   {
     qt_params.min_depth = +5;
@@ -120,12 +147,10 @@ int main()
   // Create composite particle tree:
   // -------------------------------------------------------------------------------------
   particle_tree_TYP particle_tree(&bt_params,&qt_params,&x_p,&v_p,&a_p);
-  int Nx = bt_params.num_nodes;
 
   // Populate particle tree with data:
   // -------------------------------------------------------------------------------------
-  // particle_tree.compute_bt();
-  // particle_tree.compute_qt();
+  // This steps populates the trees (binary and quad) and as the final output it provides the leaf nodes for both physical and velocity space:
   particle_tree.populate_tree();
 
   // Binary tree diagnostics:
@@ -137,12 +162,13 @@ int main()
 
   // Save leaf_x ip_count profile:
   // -------------------------------------------------------------------------------------
-  particle_tree.xq.save(root_output + "/"  + "x_q" + ".csv", csv_ascii);
-  particle_tree.ip_count.save(root_output + "/"  + "leaf_x_ip_count" + ".csv", csv_ascii);
+  particle_tree.xq.save(output_dir + "/"  + "x_q" + ".csv", csv_ascii);
+  particle_tree.ip_count.save(output_dir + "/"  + "leaf_x_ip_count" + ".csv", csv_ascii);
 
   // Quad tree diagnostics:
   // -------------------------------------------------------------------------------------
   {
+    int Nx = bt_params.num_nodes;
     vec qt_count = zeros<vec>(Nx);
     vec bt_count = zeros<vec>(Nx);
     for (int xx = 0; xx < Nx; xx++)
@@ -162,28 +188,32 @@ int main()
   // Assess conservation:PRIOR TO RESAMPLING
   // =====================================================================================
   {
-    vec m_t(Nx);
-    vec p_x(Nx);
-    vec p_r(Nx);
-    vec KE(Nx);
+    int Nx = bt_params.num_nodes;
+    vec m_t(Nx, fill::zeros);
+    vec p_x(Nx, fill::zeros);
+    vec p_r(Nx, fill::zeros);
+    vec KE(Nx, fill::zeros);
 
     for (int xx = 0; xx < Nx ; xx++)
     {
-      uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
-      m_t[xx] = sum(a_p.elem(ip));
-      mat v_p_subset = v_p.rows(ip);
-      p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
-      p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
+      if (particle_tree.leaf_x[xx] != NULL)
+      {
+        uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
+        m_t[xx] = sum(a_p.elem(ip));
+        mat v_p_subset = v_p.rows(ip);
+        p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
+        p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
 
-      KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+        KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+      }
     }
 
     cout << "Total KE before resampling = " + to_string(sum(KE)) << endl;
 
-    m_t.save(root_output + "/" + "m_profile" + ".csv",csv_ascii);
-    p_x.save(root_output + "/" + "p_x_profile" + ".csv",csv_ascii);
-    p_r.save(root_output + "/" + "p_r_profile" + ".csv",csv_ascii);
-    KE.save(root_output + "/" + "KE_profile" + ".csv",csv_ascii);
+    m_t.save(output_dir + "/" + "m_profile" + ".csv",csv_ascii);
+    p_x.save(output_dir + "/" + "p_x_profile" + ".csv",csv_ascii);
+    p_r.save(output_dir + "/" + "p_r_profile" + ".csv",csv_ascii);
+    KE.save(output_dir + "/" + "KE_profile" + ".csv",csv_ascii);
   }
 
   // STEP 5:
@@ -202,9 +232,9 @@ int main()
 
   // Save resampled distribution for post-processing
   file_type format = csv_ascii;
-  x_p.save(root_output + "/"  + "x_p_new.csv",csv_ascii);
-  v_p.save(root_output + "/"  + "v_p_new.csv",csv_ascii);
-  a_p.save(root_output + "/"  + "a_p_new.csv",csv_ascii);
+  x_p.save(output_dir + "/"  + "x_p_new.csv",csv_ascii);
+  v_p.save(output_dir + "/"  + "v_p_new.csv",csv_ascii);
+  a_p.save(output_dir + "/"  + "a_p_new.csv",csv_ascii);
 
   // STEP 7:
   // =====================================================================================
@@ -217,33 +247,37 @@ int main()
   // We can visually inspect of the particle count, coordinate and dimensions of the node match the observed number of particles in that region based on the particle data.
 
   // Save data to postprocess tree:
+  int Nx = bt_params.num_nodes;
   for (int xx = 0; xx < Nx ; xx++)
   {
     if (particle_tree.leaf_v[xx][0] != NULL)
     {
+      // Get the number of leaf nodes on current leaf_v:
+      int num_v_nodes = particle_tree.leaf_v[xx].size();
+
       // Create variables to contain data:
-      ivec node_ip_count(particle_tree.leaf_v[xx].size());
-      mat  node_center(particle_tree.leaf_v[xx].size(),2);
-      mat  node_dim(particle_tree.leaf_v[xx].size(),2);
+      ivec node_ip_count(num_v_nodes);
+      mat  node_center(num_v_nodes,2);
+      mat  node_dim(num_v_nodes,2);
 
       // Assemble data:
-      for (int vv = 0; vv < particle_tree.leaf_v[xx].size(); vv++)
+      for (int vv = 0; vv < num_v_nodes; vv++)
       {
         // cout << "ip_count = " << leaf_v[xx][vv]->ip_count << endl;
-        node_ip_count(vv)  = particle_tree.leaf_v[xx][vv]->ip_count;
+        node_ip_count(vv)   = particle_tree.leaf_v[xx][vv]->ip_count;
         node_center.row(vv) = particle_tree.leaf_v[xx][vv]->center.t();
         node_dim.row(vv)    = particle_tree.leaf_v[xx][vv]->max.t() - particle_tree.leaf_v[xx][vv]->min.t();
       }
 
       // Save data:
       string file_name;
-      file_name = root_output + "/"  + "leaf_v_" + "ip_count" + "_xx_" + to_string(xx) + ".csv";
+      file_name = output_dir + "/"  + "leaf_v_" + "ip_count" + "_xx_" + to_string(xx) + ".csv";
       node_ip_count.save(file_name, csv_ascii);
 
-      file_name = root_output + "/"  + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
+      file_name = output_dir + "/"  + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
       node_center.save(file_name, csv_ascii);
 
-      file_name = root_output + "/"  + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
+      file_name = output_dir + "/"  + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
       node_dim.save(file_name, csv_ascii);
     }
   }
@@ -255,18 +289,12 @@ int main()
   // Since we have resampled the data, in order to assess conservation, we need clear contents of trees and re-populate them
 
   // Clear contents of particle tree:
-  particle_tree.bt.clear_all();
-  for (int xx = 0; xx < Nx; xx++)
-  {
-    particle_tree.qt[xx].clear_tree();
-  }
+  particle_tree.clear_all_contents();
 
   if (false)
   {
     // Load a new data set:
-    x_p.load(input_file_name_1,csv_ascii);
-    v_p.load(input_file_name_2,csv_ascii);
-    a_p.load(input_file_name_3,csv_ascii);
+    load_input_data(root_input, picos_case, species_index, time_index,&x_p, &v_p, &a_p);
   }
 
   // Normalize data:
@@ -277,34 +305,39 @@ int main()
   particle_tree.populate_tree();
 
   // Save output:
-  particle_tree.ip_count.save(root_output + "/"  + "leaf_x_ip_count_new" + ".csv", csv_ascii);
+  particle_tree.ip_count.save(output_dir + "/"  + "leaf_x_ip_count_new" + ".csv", csv_ascii);
 
   // STEP 9:
   // =====================================================================================
   // Assess conservation: AFTER RESAMPLING
   // =====================================================================================
   {
-    vec m_t(Nx);
-    vec p_x(Nx);
-    vec p_r(Nx);
-    vec KE(Nx);
+    int Nx = bt_params.num_nodes;
+    vec m_t(Nx, fill::zeros);
+    vec p_x(Nx, fill::zeros);
+    vec p_r(Nx, fill::zeros);
+    vec KE(Nx, fill::zeros);
+
     for (int xx = 0; xx < Nx ; xx++)
     {
-      uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
-      m_t[xx] = sum(a_p.elem(ip));
-      mat v_p_subset = v_p.rows(ip);
-      p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
-      p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
+      if (particle_tree.leaf_x[xx] != NULL)
+      {
+        uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
+        m_t[xx] = sum(a_p.elem(ip));
+        mat v_p_subset = v_p.rows(ip);
+        p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
+        p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
 
-      KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+        KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
+      }
     }
 
     cout << "Total KE after resampling = " + to_string(sum(KE)) << endl;
 
-    m_t.save(root_output + "/" + "m_new_profile" + ".csv",csv_ascii);
-    p_x.save(root_output + "/" + "p_x_new_profile" + ".csv",csv_ascii);
-    p_r.save(root_output + "/" + "p_r_new_profile" + ".csv",csv_ascii);
-    KE.save(root_output + "/" + "KE_new_profile" + ".csv",csv_ascii);
+    m_t.save(output_dir + "/" + "m_new_profile" + ".csv",csv_ascii);
+    p_x.save(output_dir + "/" + "p_x_new_profile" + ".csv",csv_ascii);
+    p_r.save(output_dir + "/" + "p_r_new_profile" + ".csv",csv_ascii);
+    KE.save(output_dir + "/" + "KE_new_profile" + ".csv",csv_ascii);
   }
 
   // At this point, we have succesfully demonstrated how to apply the trees and resample the distribution and then update the tree.
@@ -323,25 +356,14 @@ int main()
   // - Rescale data and save results
 
   // Clear contents of tree:
-  particle_tree.bt.clear_all();
-  for (int xx = 0; xx < Nx; xx++)
-  {
-    particle_tree.qt[xx].clear_tree();
-  }
+  particle_tree.clear_all_contents();
 
   // Load a new data set:
   // Choose PICOS++ case:
   picos_case = "PICOS_case_2";
   species_index = "1"; // ss
   time_index    = "50"; // tt
-
-  input_file_name_1 = root_input + picos_case + "/" + "x_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
-  input_file_name_2 = root_input + picos_case + "/" + "v_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
-  input_file_name_3 = root_input + picos_case + "/" + "a_p" + "_ss_" + species_index + "_tt_" + time_index + ".csv";
-
-  x_p.load(input_file_name_1,csv_ascii);
-  v_p.load(input_file_name_2,csv_ascii);
-  a_p.load(input_file_name_3,csv_ascii);
+  load_input_data(root_input, picos_case, species_index, time_index,&x_p, &v_p, &a_p);
 
   // Normalize data:
   x_p = x_p/x_norm;
@@ -366,9 +388,9 @@ int main()
 
   // Save resampled distribution for post-processing
   format = csv_ascii;
-  x_p.save(root_output + "/"  + "x_p_new2.csv",csv_ascii);
-  v_p.save(root_output + "/"  + "v_p_new2.csv",csv_ascii);
-  a_p.save(root_output + "/"  + "a_p_new2.csv",csv_ascii);
+  x_p.save(output_dir + "/"  + "x_p_new2.csv",csv_ascii);
+  v_p.save(output_dir + "/"  + "v_p_new2.csv",csv_ascii);
+  a_p.save(output_dir + "/"  + "a_p_new2.csv",csv_ascii);
 
   // STEP 11:
   // =====================================================================================

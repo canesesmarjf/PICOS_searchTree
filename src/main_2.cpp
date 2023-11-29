@@ -379,8 +379,8 @@ int main()
         set_N.wi = a_p.elem(ip.head(N));
 
         // Calculate set M based on set N:
-        // vranic.down_sample_3D(&set_N, &set_M);
-        vranic.down_sample_2D(&set_N, &set_M);
+        // vranic.down_sample_node_3D(&set_N, &set_M);
+        vranic.down_sample_node_2D(&set_N, &set_M);
 
         // Diagnostics:
         if (false)

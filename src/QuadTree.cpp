@@ -71,7 +71,11 @@ void q_node_TYP::get_leaf_nodes(vector<q_node_TYP *> * leafs)
   int method = 2;
   if (is_node_leaf(method) == true)
   {
+    // Add data to output variable:
     leafs->push_back(this);
+
+    // If a leaf has been found, then no need to drill in deeper:
+    return;
   }
 
   // Traverse the tree:
@@ -88,11 +92,19 @@ void q_node_TYP::get_leaf_nodes(vector<q_node_TYP *> * leafs)
 // =======================================================================================
 void q_node_TYP::delete_nodes()
 {
+  // This method loops over ALL subnodes of the present node and identifies which subnodes have pointers to other nodes.
+  // If a subnode has a valid pointer, it then drills into it (recursion).
+  // The recursion finishes whenever a given node has NULL for ALL its subnodes.
+  // This condition is the definition of a leaf node.
+  // When that condition is net, delete_nodes does nothing and just returns to the calling stack and deletes the subnode[nn] from which we just returned.
+  // In other words, it deletes the leaf subnode and them moves to the next nn
+
   for (int nn = 0; nn < 4; nn++)
   {
     if (this->subnode[nn] != NULL) // if subnode[nn] exists
     {
       this->subnode[nn]->delete_nodes();
+      // This section can only be reached if all elements of this->subnode == NULL
 
       // Release memory pointed by subnode[nn]:
       delete this->subnode[nn];
@@ -126,11 +138,7 @@ q_node_TYP::q_node_TYP(vec min, vec max, uint depth, qt_params_TYP * qt_params,v
   this->is_leaf = false;
 
   // Allocate memory for subnodes:
-  this->subnode.reserve(4);
-  this->subnode[0] = NULL;
-  this->subnode[1] = NULL;
-  this->subnode[2] = NULL;
-  this->subnode[3] = NULL;
+  this->subnode.resize(4, NULL);  
   this->ip_subnode.resize(4);
 }
 

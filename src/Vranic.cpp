@@ -1,7 +1,7 @@
 #include "Vranic.h"
 
 // ======================================================================================
-void vranic_TYP::down_sample_3D(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
+void vranic_TYP::down_sample_node_3D(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
 {
   // Create refereces:
   // This does NOT require copy operation
@@ -116,7 +116,7 @@ void vranic_TYP::down_sample_3D(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
 }
 
 // ======================================================================================
-void vranic_TYP::down_sample_2D(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
+void vranic_TYP::down_sample_node_2D(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
 {
   // Create refereces:
   // This does NOT require copy operation
@@ -129,6 +129,7 @@ void vranic_TYP::down_sample_2D(merge_cell_TYP * set_N, merge_cell_TYP * set_M)
   arma::vec& yi_M = set_M->yi;
   arma::vec& zi_M = set_M->zi;
 
+  // Since this method has been repurposed from the 3D case, to make it 2D we need to neglect the non-velocity variable which in this case is the "xi" variable (physical space):
   xi = xi*0;
 
   // Calculate merge-cell statistics:

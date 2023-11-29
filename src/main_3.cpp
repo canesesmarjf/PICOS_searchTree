@@ -58,7 +58,6 @@ int main()
   // Derived strings from user's input:
   string scenario = "ss_" + species_index + "_tt_" + time_index;
   string output_dir = root_output + picos_case + "/" + scenario;
-  // string input_dir  = root_output + picos_case + "/" + scenario;
 
   // Create directory where output data is to be stored:
   // =====================================================================================
@@ -151,22 +150,23 @@ int main()
   // Populate particle tree with data:
   // -------------------------------------------------------------------------------------
   // This steps populates the trees (binary and quad) and as the final output it provides the leaf nodes for both physical and velocity space:
-  particle_tree.populate_tree();
+  particle_tree.populate_tree("binary and quad");
 
   // Binary tree diagnostics:
-  // -------------------------------------------------------------------------------------
-  int k = particle_tree.bt.count_leaf_nodes();
-  cout << "total number of leaf nodes populated: " << k << endl;
-  k = particle_tree.bt.count_leaf_points();
-  cout << "total number of leaf points inserted: " << k << endl;
+  {
+    // ----------------------------------------------------------------------------------
+    int k = particle_tree.bt.count_leaf_nodes();
+    cout << "total number of leaf nodes populated: " << k << endl;
+    k = particle_tree.bt.count_leaf_points();
+    cout << "total number of leaf points inserted: " << k << endl;
 
-  // Save leaf_x ip_count profile:
-  // -------------------------------------------------------------------------------------
-  particle_tree.xq.save(output_dir + "/"  + "x_q" + ".csv", csv_ascii);
-  particle_tree.ip_count.save(output_dir + "/"  + "leaf_x_ip_count" + ".csv", csv_ascii);
+    // Save leaf_x ip_count profile:
+    // ----------------------------------------------------------------------------------
+    particle_tree.xq.save(output_dir + "/"  + "x_q" + ".csv", csv_ascii);
+    particle_tree.ip_count.save(output_dir + "/"  + "leaf_x_ip_count" + ".csv", csv_ascii);
+  }
 
   // Quad tree diagnostics:
-  // -------------------------------------------------------------------------------------
   {
     int Nx = bt_params.num_nodes;
     vec qt_count = zeros<vec>(Nx);
@@ -187,44 +187,24 @@ int main()
   // =====================================================================================
   // Assess conservation:PRIOR TO RESAMPLING
   // =====================================================================================
-  {
-    int Nx = bt_params.num_nodes;
-    vec m_t(Nx, fill::zeros);
-    vec p_x(Nx, fill::zeros);
-    vec p_r(Nx, fill::zeros);
-    vec KE(Nx, fill::zeros);
+  particle_tree.assess_conservation(output_dir,"0");
 
-    for (int xx = 0; xx < Nx ; xx++)
-    {
-      if (particle_tree.leaf_x[xx] != NULL)
-      {
-        uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
-        m_t[xx] = sum(a_p.elem(ip));
-        mat v_p_subset = v_p.rows(ip);
-        p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
-        p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
-
-        KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
-      }
-    }
-
-    cout << "Total KE before resampling = " + to_string(sum(KE)) << endl;
-
-    m_t.save(output_dir + "/" + "m_profile" + ".csv",csv_ascii);
-    p_x.save(output_dir + "/" + "p_x_profile" + ".csv",csv_ascii);
-    p_r.save(output_dir + "/" + "p_r_profile" + ".csv",csv_ascii);
-    KE.save(output_dir + "/" + "KE_profile" + ".csv",csv_ascii);
-  }
+  // STEP 7:
+  // =====================================================================================
+  // Save tree data PRIOR TO RESAMPLING to visualise tree structure in MATLAB:
+  // =====================================================================================
+  particle_tree.save_leaf_v_structure(output_dir);
 
   // STEP 5:
   // =====================================================================================
   // Resample distribution:
   // =====================================================================================
+  // In this process, we assemble both the binary and quad trees with corresponding leaf_x and leaf_v objects. In addition, the contents of the particle tree removed as the resampling process changes the distribution.
   particle_tree.resample_distribution();
 
   // STEP 6:
   // =====================================================================================
-  // Save resampled distribution to file:
+  // Save RESAMPLED distribution to file:
   // =====================================================================================
   // Rescale:
   x_p*= x_norm;
@@ -236,60 +216,11 @@ int main()
   v_p.save(output_dir + "/"  + "v_p_new.csv",csv_ascii);
   a_p.save(output_dir + "/"  + "a_p_new.csv",csv_ascii);
 
-  // STEP 7:
-  // =====================================================================================
-  // Save data from tree to be post-processed in MATLAB:
-  // =====================================================================================
-  // For every leaf_x node, there is a corresponding quadtree in velocity space.
-  // From each of those quadtrees, we have extracted leaf_v which contains a list of all the leaf nodes in velocity space for a given "x" location.
-  // What we are doing in this section is to save the particle count, coordinates and dimensions of the leaf_v nodes on each "x" location,
-  // This data can then be plotted in MATLAB as a group of nested bisected quadrants in velocity space and then we can superimpose the particle data to confirm whether of not the quadtree algorithm is working.
-  // We can visually inspect of the particle count, coordinate and dimensions of the node match the observed number of particles in that region based on the particle data.
-
-  // Save data to postprocess tree:
-  int Nx = bt_params.num_nodes;
-  for (int xx = 0; xx < Nx ; xx++)
-  {
-    if (particle_tree.leaf_v[xx][0] != NULL)
-    {
-      // Get the number of leaf nodes on current leaf_v:
-      int num_v_nodes = particle_tree.leaf_v[xx].size();
-
-      // Create variables to contain data:
-      ivec node_ip_count(num_v_nodes);
-      mat  node_center(num_v_nodes,2);
-      mat  node_dim(num_v_nodes,2);
-
-      // Assemble data:
-      for (int vv = 0; vv < num_v_nodes; vv++)
-      {
-        // cout << "ip_count = " << leaf_v[xx][vv]->ip_count << endl;
-        node_ip_count(vv)   = particle_tree.leaf_v[xx][vv]->ip_count;
-        node_center.row(vv) = particle_tree.leaf_v[xx][vv]->center.t();
-        node_dim.row(vv)    = particle_tree.leaf_v[xx][vv]->max.t() - particle_tree.leaf_v[xx][vv]->min.t();
-      }
-
-      // Save data:
-      string file_name;
-      file_name = output_dir + "/"  + "leaf_v_" + "ip_count" + "_xx_" + to_string(xx) + ".csv";
-      node_ip_count.save(file_name, csv_ascii);
-
-      file_name = output_dir + "/"  + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
-      node_center.save(file_name, csv_ascii);
-
-      file_name = output_dir + "/"  + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
-      node_dim.save(file_name, csv_ascii);
-    }
-  }
-
   // STEP 8:
   // =====================================================================================
   // Assess conservation: AFTER RESAMPLING
   // =====================================================================================
-  // Since we have resampled the data, in order to assess conservation, we need clear contents of trees and re-populate them
-
-  // Clear contents of particle tree:
-  particle_tree.clear_all_contents();
+  // Immediately after resampling, the tree is cleared. we have resampled the data, in order to assess conservation, we need clear contents of trees and re-populate them
 
   if (false)
   {
@@ -302,7 +233,7 @@ int main()
   v_p = v_p/y_norm;
 
   // Repopulate trees with resampled data:
-  particle_tree.populate_tree();
+  particle_tree.populate_tree("binary and quad");
 
   // Save output:
   particle_tree.ip_count.save(output_dir + "/"  + "leaf_x_ip_count_new" + ".csv", csv_ascii);
@@ -311,34 +242,7 @@ int main()
   // =====================================================================================
   // Assess conservation: AFTER RESAMPLING
   // =====================================================================================
-  {
-    int Nx = bt_params.num_nodes;
-    vec m_t(Nx, fill::zeros);
-    vec p_x(Nx, fill::zeros);
-    vec p_r(Nx, fill::zeros);
-    vec KE(Nx, fill::zeros);
-
-    for (int xx = 0; xx < Nx ; xx++)
-    {
-      if (particle_tree.leaf_x[xx] != NULL)
-      {
-        uvec ip = conv_to<uvec>::from(particle_tree.leaf_x[xx]->ip);
-        m_t[xx] = sum(a_p.elem(ip));
-        mat v_p_subset = v_p.rows(ip);
-        p_x[xx] = dot(a_p.elem(ip),v_p_subset.col(0));
-        p_r[xx] = dot(a_p.elem(ip),v_p_subset.col(1));
-
-        KE[xx] = (dot(a_p.elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p.elem(ip),pow(v_p_subset.col(1),2)));
-      }
-    }
-
-    cout << "Total KE after resampling = " + to_string(sum(KE)) << endl;
-
-    m_t.save(output_dir + "/" + "m_new_profile" + ".csv",csv_ascii);
-    p_x.save(output_dir + "/" + "p_x_new_profile" + ".csv",csv_ascii);
-    p_r.save(output_dir + "/" + "p_r_new_profile" + ".csv",csv_ascii);
-    KE.save(output_dir + "/" + "KE_new_profile" + ".csv",csv_ascii);
-  }
+  particle_tree.assess_conservation(output_dir,"1");
 
   // At this point, we have succesfully demonstrated how to apply the trees and resample the distribution and then update the tree.
 
@@ -356,7 +260,7 @@ int main()
   // - Rescale data and save results
 
   // Clear contents of tree:
-  particle_tree.clear_all_contents();
+  // particle_tree.clear_all_contents();
 
   // Load a new data set:
   // Choose PICOS++ case:
@@ -370,7 +274,7 @@ int main()
   v_p = v_p/y_norm;
 
   // Repopulate trees with new data:
-  particle_tree.populate_tree();
+  particle_tree.populate_tree("binary and quad");
 
   // STEP XX:
   // =====================================================================================

@@ -2,6 +2,11 @@
 
 using namespace arma;
 
+/* The following is an example of how to use the particle tree in PICOS++:
+vector<particle_tree_TYP> IONS_tree;
+IONS_tree.leaf_x[xx]->ip; // Get the indices of particles in the x_node at xx
+*/
+
 // ======================================================================================
 particle_tree_TYP::particle_tree_TYP(bt_params_TYP * bt_params, qt_params_TYP * qt_params, vec * x_p, mat * v_p, vec * a_p)
 {
@@ -31,9 +36,6 @@ particle_tree_TYP::particle_tree_TYP(bt_params_TYP * bt_params, qt_params_TYP * 
   // Allocate memory and resize ip_count:
   ip_count = zeros<ivec>(Nx);
 }
-
-// vector<particle_tree_TYP> IONS_tree;
-// IONS_tree.leaf_x[xx]->ip;
 
 // ======================================================================================
 void particle_tree_TYP::create_x_query_grid()
@@ -68,8 +70,15 @@ void particle_tree_TYP::get_mean_ip_count()
   // 1- Cast numerator as a double so that division retains fractional part
   // 2- Round UP to the nearest LARGEST integer so as to over-estimate total number of particles. We later test for total particle usage to avoid "out of bounds" access.
 
+  // This calculation is needed to determine the target particle count we need to have on each x-node in order to achieve a flat or near flat computational particle density along the x dimension:
+
+  // Total number of x-nodes:
   int Nx = bt_params->num_nodes;
+
+  // Total number of particles indexed in x-nodes:
   int p_count_sum = sum(ip_count);
+
+  // Calculate the mean particle number along the x dimension:
   mean_ip_count = ceil((double)p_count_sum/Nx);
 }
 
@@ -117,26 +126,55 @@ void particle_tree_TYP::calculate_leaf_v()
 }
 
 // ======================================================================================
-void particle_tree_TYP::populate_tree()
+void particle_tree_TYP::populate_binary_tree()
 {
   // Create a vector with pointers to the data:
   vector<vec *> x_data = {x_p};
 
-  // Insert 1D points into tree:
+  // Insert 1D points into binary tree:
   bt.insert_all(x_data);
 
   // Calculate leaf_x list:
   this->calculate_leaf_x();
 
   // Calculating the mean number of particles per node:
+  // This is to be used by quad tree
   this->get_mean_ip_count();
+}
+
+// ======================================================================================
+void particle_tree_TYP::populate_quad_tree()
+{
+  // This method requires that we have a valid binary tree.
+  // Assumes we have used this->populate_binary_tree() prior.
 
   // Assemble quadtrees for each leaf_x element:
   this->assemble_qt_vector();
 
   // Assembling leaf_v 2D vector:
   this->calculate_leaf_v();
+}
 
+// ======================================================================================
+void particle_tree_TYP::populate_tree(string calculation_type)
+{
+  // Clear contents to prevent doubling up on data:
+  this->clear_all_contents();
+
+  // Select the calculation type:
+  if (calculation_type == "binary and quad")
+  {
+    this->populate_binary_tree();
+    this->populate_quad_tree();
+  }
+  else if (calculation_type == "binary only")
+  {
+    this->populate_binary_tree();
+  }
+  else
+  {
+    cout << "Error, calculation type not recognized" << endl;
+  }
 }
 
 // =======================================================================================
@@ -152,6 +190,88 @@ void particle_tree_TYP::clear_all_contents()
     this->qt[xx].clear_tree();
   }
 
+}
+
+// =======================================================================================
+void particle_tree_TYP::save_leaf_v_structure(string output_dir)
+{
+  // This method saves data from leaf_v so that the entire tree structure (binary + quad) can be visualized in MATLAB:
+
+  // For every leaf_x node, there is a corresponding quadtree in velocity space.
+  // From each of those quadtrees, we have extracted leaf_v which contains a list of all the leaf nodes in velocity space for a given "x" location.
+  // What we are doing in this section is to save the particle count, coordinates and dimensions of the leaf_v nodes on each "x" location,
+  // This data can then be plotted in MATLAB as a group of nested bisected quadrants in velocity space and then we can superimpose the particle data to confirm whether of not the quadtree algorithm is working.
+  // We can visually inspect of the particle count, coordinate and dimensions of the node match the observed number of particles in that region based on the particle data.
+
+  int Nx = bt_params->num_nodes;
+  for (int xx = 0; xx < Nx ; xx++)
+  {
+    if (leaf_v[xx][0] != NULL)
+    {
+      // Get the number of leaf nodes on current leaf_v:
+      int num_v_nodes = leaf_v[xx].size();
+
+      // Create variables to contain data:
+      ivec node_ip_count(num_v_nodes);
+      mat  node_center(num_v_nodes,2);
+      mat  node_dim(num_v_nodes,2);
+
+      // Assemble data:
+      for (int vv = 0; vv < num_v_nodes; vv++)
+      {
+        node_ip_count(vv)   = leaf_v[xx][vv]->ip_count;
+        node_center.row(vv) = leaf_v[xx][vv]->center.t();
+        node_dim.row(vv)    = leaf_v[xx][vv]->max.t() - leaf_v[xx][vv]->min.t();
+      }
+
+      // Save data:
+      string file_name;
+      file_name = \
+      output_dir + "/"  + "leaf_v_" + "ip_count" + "_xx_" + to_string(xx) + ".csv";
+      node_ip_count.save(file_name, csv_ascii);
+
+      file_name = \
+      output_dir + "/"  + "leaf_v_" + "node_center" + "_xx_" + to_string(xx) + ".csv";
+      node_center.save(file_name, csv_ascii);
+
+      file_name = \
+      output_dir + "/"  + "leaf_v_" + "node_dim" + "_xx_" + to_string(xx) + ".csv";
+      node_dim.save(file_name, csv_ascii);
+    }
+  }
+}
+
+// =======================================================================================
+void particle_tree_TYP::assess_conservation(string output_dir, string suffix)
+{
+  // Only requires that we assemble the binary tree and leaf_x:
+
+  int Nx = bt_params->num_nodes;
+  vec m_t(Nx, fill::zeros);
+  vec p_x(Nx, fill::zeros);
+  vec p_r(Nx, fill::zeros);
+  vec KE(Nx, fill::zeros);
+
+  for (int xx = 0; xx < Nx ; xx++)
+  {
+    if (leaf_x[xx] != NULL)
+    {
+      uvec ip = conv_to<uvec>::from(leaf_x[xx]->ip);
+      m_t[xx] = sum(a_p->elem(ip));
+      mat v_p_subset = v_p->rows(ip);
+      p_x[xx] = dot(a_p->elem(ip),v_p_subset.col(0));
+      p_r[xx] = dot(a_p->elem(ip),v_p_subset.col(1));
+
+      KE[xx] = (dot(a_p->elem(ip),pow(v_p_subset.col(0),2)) + dot(a_p->elem(ip),pow(v_p_subset.col(1),2)));
+    }
+  }
+
+  cout << "Suffix: " + suffix + ". Total KE = " + to_string(sum(KE)) << endl;
+
+  m_t.save(output_dir + "/" + "m_profile_" + suffix + ".csv",csv_ascii);
+  p_x.save(output_dir + "/" + "p_x_profile_" + suffix + ".csv",csv_ascii);
+  p_r.save(output_dir + "/" + "p_r_profile_" + suffix  + ".csv",csv_ascii);
+  KE.save(output_dir + "/" + "KE_profile_" + suffix + ".csv",csv_ascii);
 }
 
 // ======================================================================================
@@ -429,4 +549,10 @@ void particle_tree_TYP::resample_distribution()
   // Up-sample deficit nodes via replication:
   // -------------------------------------------------------------------------------------
   this->upsample_deficit_nodes(&ip_free);
+
+  // Clear contents of particle tree:
+  // -------------------------------------------------------------------------------------
+  // Since the distribution has been changed, the particle tree is no longer current and needs to be cleared.
+  this->clear_all_contents();
+
 }

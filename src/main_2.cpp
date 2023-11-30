@@ -8,9 +8,9 @@
 #include <filesystem>
 #include <vector>
 
-#include "BinaryTree.h"
-#include "QuadTree.h"
-#include "Vranic.h"
+#include "binary_tree.h"
+#include "quad_tree.h"
+#include "vranic_downsampling.h"
 
 using namespace std::chrono;
 using namespace std;

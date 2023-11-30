@@ -1,4 +1,4 @@
-#include "Vranic.h"
+#include "vranic_downsampling.h"
 
 // ======================================================================================
 void vranic_TYP::down_sample_node_3D(merge_cell_TYP * set_N, merge_cell_TYP * set_M)

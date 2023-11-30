@@ -21,7 +21,7 @@ OPT = -g
 # ========================================================================================
 all: $(EXES)
 
-bin/%.exe: obj/%.o obj/BinaryTree.o obj/Vranic.o obj/QuadTree.o obj/particle_tree.o
+bin/%.exe: obj/%.o obj/binary_tree.o obj/vranic_downsampling.o obj/quad_tree.o obj/particle_tree.o
 	$(COMPILER) -o $@ $^ $(LIBS)
 
 	if [ $(SYS) = "Darwin" ]; then \
@@ -32,16 +32,16 @@ bin/%.exe: obj/%.o obj/BinaryTree.o obj/Vranic.o obj/QuadTree.o obj/particle_tre
 obj/%.o: src/%.cpp
 	$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
 
-obj/BinaryTree.o: src/BinaryTree.cpp include/BinaryTree.h
+obj/binary_tree.o: src/binary_tree.cpp include/binary_tree.h
 	$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
 
-obj/QuadTree.o: src/QuadTree.cpp include/QuadTree.h
+obj/quad_tree.o: src/quad_tree.cpp include/quad_tree.h
 		$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
 
 obj/particle_tree.o: src/particle_tree.cpp include/particle_tree.h
 		$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
 
-obj/Vranic.o: src/Vranic.cpp include/Vranic.h
+obj/vranic_downsampling.o: src/vranic_downsampling.cpp include/vranic_downsampling.h
 	$(COMPILER) $(OPT) -c $< -o $@ $(INCL) -std=c++17
 
 clean:

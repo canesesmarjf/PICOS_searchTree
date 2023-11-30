@@ -4,9 +4,9 @@
 #include <vector>
 #include <armadillo>
 
-#include "BinaryTree.h"
-#include "QuadTree.h"
-#include "Vranic.h"
+#include "binary_tree.h"
+#include "quad_tree.h"
+#include "vranic_downsampling.h"
 
 using namespace std;
 using namespace arma;
@@ -39,7 +39,7 @@ public:
   void clear_all_contents();
   void assess_conservation(string output_dir, string suffix);
   void save_leaf_v_structure(string output_dir);
-  
+
 private:
   void downsample_surplus_nodes(vector<uint> * ip_free);
   void upsample_deficit_nodes(vector<uint> * ip_free);

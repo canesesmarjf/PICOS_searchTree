@@ -1,4 +1,4 @@
-#include "QuadTree.h"
+#include "quad_tree.h"
 #include <iostream>
 
 // =======================================================================================
@@ -138,7 +138,7 @@ q_node_TYP::q_node_TYP(vec min, vec max, uint depth, qt_params_TYP * qt_params,v
   this->is_leaf = false;
 
   // Allocate memory for subnodes:
-  this->subnode.resize(4, NULL);  
+  this->subnode.resize(4, NULL);
   this->ip_subnode.resize(4);
 }
 
